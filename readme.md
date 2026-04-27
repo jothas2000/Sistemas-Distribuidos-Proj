@@ -1,138 +1,66 @@
-# 💬 Chat Distribuído TCP - UTFPR
+# 💬 Chat Distribuído TCP - Entrega 1 (EP-1)
 
-Sistema de mensagens multiusuário desenvolvido para a disciplina de **Sistemas Distribuídos** na **UTFPR - Campus Ponta Grossa**. O projeto implementa a comunicação entre processos via **Sockets TCP**, utilizando o formato **JSON** como protocolo de aplicação.
-
----
+Este projeto implementa um sistema de Chat Cliente-Servidor distribuído utilizando Sockets TCP puros em Java. O sistema foi desenvolvido com foco em tolerância a falhas e segue estritamente um protocolo customizado de troca de mensagens em formato JSON.
 
 ## 🏗️ Arquitetura do Sistema
 
-O sistema segue o modelo **Cliente-Servidor Iterativo**. Nesta fase do projeto (**Entrega 1**), o servidor processa **uma requisição por vez**, de forma sequencial.
+* **Modelo:** Cliente-Servidor Iterativo (Single-threaded). O servidor processa uma requisição por vez, utilizando a fila de espera (*backlog*) do SO para gerenciar múltiplas tentativas de conexão.
+* **Comunicação:** Síncrona baseada em requisição e resposta (Pull/Fórum). O cliente envia operações e o servidor responde no formato padrão estipulado pelo protocolo.
+* **Formatação:** A serialização e desserialização dos pacotes de rede é feita via JSON utilizando a biblioteca **Google Gson**.
 
-### 🔧 Componentes
+## 📜 Protocolo de Comunicação Implementado
 
-* **ChatServerTCP**
-  Responsável por gerenciar o banco de dados em memória (HashMap), autenticar usuários e manter o histórico global de mensagens.
+O sistema obedece rigorosamente as restrições do protocolo exigido:
 
-* **ChatClientGUI**
-  Interface gráfica desenvolvida em **Swing**, utilizando **CardLayout** para alternância entre telas (Login / Chat).
+1. **Operações (CRUD completo):**
+   * `login` / `logout`
+   * `cadastrarUsuario`
+   * `consultarUsuario` (Atualizar Histórico / Read)
+   * `atualizarUsuario`
+   * `deletarUsuario`
+   * `enviarMensagem`
+2. **Segurança e Validação:**
+   * Senhas restritas a **exatamente 6 dígitos numéricos**.
+   * Sistema de Autenticação por Tokens (`usr_` para usuários comuns, `adm` para administradores).
+3. **Respostas Padronizadas:**
+   * Todas as respostas do servidor incluem o campo `"resposta"` com códigos HTTP (ex: `200` Sucesso, `401` Não Autorizado, `500` Erro Interno).
+4. **Tolerância a Falhas:**
+   * O servidor possui blindagem contra quedas de conexão abruptas (`SocketException: Connection Reset`), garantindo que não trave se um cliente se desconectar inesperadamente.
 
-* **MensagemDTO**
-  Objeto de Transferência de Dados responsável por padronizar a comunicação via JSON entre cliente e servidor.
+## 🚀 Como Compilar e Executar
 
----
+O projeto utiliza o arquivo `gson-2.10.1.jar` localizado na pasta `lib`. O processo de compilação varia levemente dependendo do Sistema Operacional devido ao separador de variáveis de ambiente (`:` no Linux e `;` no Windows).
 
-## 📋 Protocolo de Aplicação (JSON)
-
-As mensagens trocadas entre cliente e servidor seguem os formatos abaixo:
-
-### 🔐 Autenticação e Usuários
-
-**Login**
-
-```json
-{ "op": "login", "usuario": "admin", "senha": "123" }
-```
-
-**Cadastro**
-
-```json
-{ "op": "create", "usuario": "nome", "senha": "123456" }
-```
-
----
-
-### 💬 Mensageria
-
-**Enviar Mensagem**
-
-```json
-{ "op": "send", "usuario": "nome", "texto": "sua mensagem", "token": "seu_token" }
-```
-
-**Ler Histórico**
-
-```json
-{ "op": "read", "usuario": "nome" }
-```
-
----
-
-## 🛠️ Setup do Projeto
-
-### 📁 Estrutura de Pastas
-
-```
-Sistemas-Distribuidos/
-├── bin/                 # Binários (.class)
-├── lib/                 # Dependências (gson-2.10.1.jar)
-├── src/                 # Código-fonte (.java)
-└── README.md
-```
-
----
-
-### ⚙️ Compilação e Execução (Linux)
-
-#### 1. Limpar e Compilar
-
+### No Linux (Terminal)
+**1. Compilar os arquivos (enviando para a pasta bin):**
 ```bash
-rm -rf bin/*
 javac -d bin -cp ".:lib/gson-2.10.1.jar" src/*.java
 ```
-
-#### 2. Iniciar o Servidor
-
+**2. Executar o Servidor:**
 ```bash
 java -cp "bin:lib/gson-2.10.1.jar" ChatServerTCP
 ```
-
-#### 3. Iniciar o Cliente
-
+**3. Executar o Cliente:**
 ```bash
 java -cp "bin:lib/gson-2.10.1.jar" ChatClientGUI
 ```
 
----
+### No Windows (PowerShell / CMD)
+**1. Compilar os arquivos:**
+```powershell
+javac -d bin -cp ".;lib/gson-2.10.1.jar" src/*.java
+```
+**2. Executar o Servidor:**
+```powershell
+java -cp "bin;lib/gson-2.10.1.jar" ChatServerTCP
+```
+**3. Executar o Cliente:**
+```powershell
+java -cp "bin;lib/gson-2.10.1.jar" ChatClientGUI
+```
 
-## 🧪 Roteiro de Testes (Importante)
-
-Devido à natureza iterativa do servidor nesta entrega:
-
-* Acesse com o primeiro usuário
-* Execute as operações desejadas
-* Clique em **Logout**
-
-O botão **Logout** encerra a sessão TCP (`bye`), liberando o servidor para o próximo cliente.
-
-Ao logar com um segundo usuário:
-
-* O histórico de mensagens anterior será carregado automaticamente
-* Isso ocorre por meio da operação **read**, exibida na interface de chat
-
----
-
-## 👨‍🎓 Informações Acadêmicas
-
-* **Acadêmico:** Thales do Prado Menendez
-* **Instituição:** Universidade Tecnológica Federal do Paraná (UTFPR - Ponta Grossa)
-* **Curso:** Bacharelado em Ciência da Computação
-
----
-
-## 📌 Observações
-
-Este projeto representa a primeira etapa da implementação de um sistema distribuído, focando em:
-
-* Comunicação via sockets TCP
-* Serialização de dados com JSON
-* Controle básico de sessões
-* Estrutura cliente-servidor sequencial
-
-Futuras melhorias podem incluir:
-
-* Servidor concorrente (multi-thread)
-* Persistência em banco de dados
-* Melhorias na interface gráfica
-* Segurança (criptografia e autenticação robusta)
-
----
+## 🖥️ Utilização
+1. Inicie o Servidor e defina a porta de escuta (ex: `8080`).
+2. Abra um ou mais Clientes. Informe o IP da máquina onde o servidor está rodando (use `127.0.0.1` se for local ou o IP da rede/Tailscale/Radmin) e a porta.
+3. Cadastre um usuário respeitando a regra de senha (6 números).
+4. O Histórico Geral suporta identificação visual: mensagens próprias ficam em verde, alertas do sistema em verde/vermelho e as demais em preto.
