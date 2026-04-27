@@ -1,0 +1,14 @@
+{
+    "java.project.sourcePaths": [
+        ".",
+        "docs/Códigos em Java do Servidor de Eco-20260426/TCP Bloqueante",
+        "src"
+    ],
+    "java.project.referencedLibraries": [
+        "lib/**/*.jar"
+    ],
+    "java.format.settings.url": ".vscode/java-formatter.xml",
+    "[java]": {
+        "editor.insertSpaces": false
+    }
+}
