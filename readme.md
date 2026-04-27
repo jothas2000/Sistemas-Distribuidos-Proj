@@ -64,3 +64,4 @@ java -cp "bin;lib/gson-2.10.1.jar" ChatClientGUI
 2. Abra um ou mais Clientes. Informe o IP da máquina onde o servidor está rodando (use `127.0.0.1` se for local ou o IP da rede/Tailscale/Radmin) e a porta.
 3. Cadastre um usuário respeitando a regra de senha (6 números).
 4. O Histórico Geral suporta identificação visual: mensagens próprias ficam em verde, alertas do sistema em verde/vermelho e as demais em preto.
+5. Ainda não suporta multiplos usuários por não ter o sistema de multithreads, o servidor consegue conectar com um usuário de cada vez mantendo em memória as mensagens mandadas por cada um.
