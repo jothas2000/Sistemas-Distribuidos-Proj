@@ -21,6 +21,8 @@ public class ChatClientGUI extends JFrame {
     private JTextArea areaLogs = new JTextArea();
     private JTabbedPane abasApp = new JTabbedPane();
     private JPanel painelAdmin;
+    private JTextField fNovoNome = new JTextField();
+    private JPasswordField fNovaSenha = new JPasswordField();
 
     public ChatClientGUI() {
         setTitle("Chat Distribuído - UTFPR (EP-1)");
@@ -107,9 +109,19 @@ public class ChatClientGUI extends JFrame {
                 MensagemDTO res = enviarDados(u, null, s, "login", null);
                 if (res != null && "200".equals(res.resposta)) {
                     meuUsuario = u; meuToken = res.token;
+
+                    MensagemDTO resNome = enviarDados(u, null, null, "consultarUsuario", null);
+                    if (resNome != null && "200".equals(resNome.resposta)) {
+                        meuUsuario = resNome.nome; // Agora a variável guarda o Nome Real e não apenas o login
+                                        
+                        // AQUI: Reafirma o token recebido pela consulta
+                        if (resNome.token != null) {
+                            meuToken = resNome.token; 
+                        }
+                    }
                     configurarAbas(); 
                     cardLayout.show(painelPrincipal, "APP");
-                    atualizarChat(); 
+                    //atualizarChat(); 
                 } else {
                     JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro de conexão", "Falha", JOptionPane.ERROR_MESSAGE);
                     // O PULO DO GATO: Se o login falhou, libere o servidor!
@@ -144,15 +156,20 @@ public class ChatClientGUI extends JFrame {
     }
 
     private void configurarAbas() {
+        // A interface básica já é carregada no criarTelaApp.
+        // Aqui apenas controlamos se a aba "Admin" deve aparecer ou não.
         if ("adm".equals(meuToken)) {
-            if (abasApp.indexOfTab("Controle Admin") == -1) abasApp.addTab("Controle Admin", painelAdmin);
+            if (abasApp.indexOfTab("Admin") == -1) {
+                abasApp.addTab("Admin", painelAdmin);
+            }
         } else {
-            int idx = abasApp.indexOfTab("Controle Admin");
-            if (idx != -1) abasApp.remove(idx);
+            int index = abasApp.indexOfTab("Admin");
+            if (index != -1) abasApp.removeTabAt(index);
         }
     }
 
     private Container criarTelaApp() {
+
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         split.setDividerLocation(550);
         
@@ -169,9 +186,8 @@ public class ChatClientGUI extends JFrame {
         
         JPanel pAcoes = new JPanel(new FlowLayout(FlowLayout.CENTER));
         JButton bAtu = new JButton("Atualizar Histórico"); 
-        JButton bUpd = new JButton("Alterar Senha");
         JButton bDel = new JButton("Apagar Minha Conta");
-        pAcoes.add(bAtu); pAcoes.add(bUpd); pAcoes.add(bDel);
+        pAcoes.add(bAtu); pAcoes.add(bDel); // Botão antigo de alterar senha foi removido daqui
 
         JPanel pSul = new JPanel(new BorderLayout());
         pSul.add(pEnvio, BorderLayout.NORTH);
@@ -179,7 +195,9 @@ public class ChatClientGUI extends JFrame {
 
         pChat.add(new JScrollPane(areaChatPane), BorderLayout.CENTER); 
         pChat.add(pSul, BorderLayout.SOUTH);
+        
         abasApp.addTab("Chat Geral", pChat);
+        abasApp.addTab("Perfil/Config", criarPainelConfiguracoes()); // AQUI A NOVA ABA É ADICIONADA
 
         painelAdmin = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 20));
         JTextField tDelAdmin = new JTextField(15); 
@@ -215,55 +233,51 @@ public class ChatClientGUI extends JFrame {
             if(!tMsg.getText().trim().isEmpty()) {
                 enviarDados(meuUsuario, null, null, "enviarMensagem", tMsg.getText()); 
                 tMsg.setText(""); 
-                atualizarChat(); 
+                //atualizarChat(); 
             }
         });
         
-        bAtu.addActionListener(e -> atualizarChat());
+        //bAtu.addActionListener(e -> atualizarChat());
         
-        bUpd.addActionListener(e -> { 
-            String nova = JOptionPane.showInputDialog(this, "Nova Senha (6 números):");
-            if (nova != null && !nova.trim().isEmpty()) {
-                nova = nova.trim(); // <-- Garante que espaços acidentais não quebrem o protocolo
-                MensagemDTO m = new MensagemDTO(); m.op="atualizarUsuario"; m.usuario=meuUsuario; m.token=meuToken; m.novaSenha=nova;
-                MensagemDTO res = processarObjeto(m);
-                JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro");
-            }
-        });
 
-        bDel.addActionListener(e -> { 
-            int opc = JOptionPane.showConfirmDialog(this, "Deseja realmente apagar SUA conta?", "Confirmação", JOptionPane.YES_NO_OPTION);
-            if (opc == JOptionPane.YES_OPTION) {
-                // 1. Manda apagar
-                enviarDados(meuUsuario, null, null, "deletarUsuario", null);
-                
-                // 2. Manda o logout para avisar o servidor que estamos saindo! (ESSENCIAL)
-                enviarDados(meuUsuario, null, null, "logout", null);
-                try { socket.close(); } catch (Exception ex) {}
-                
-                // 3. Limpa a tela
-                areaLogs.setText(""); areaChatPane.setText("");
-                cardLayout.show(painelPrincipal, "LOGIN");
+
+        bDel.addActionListener(e -> {
+            int confirma = JOptionPane.showConfirmDialog(this, "Tem certeza que deseja apagar sua conta permanentemente?", "Confirmar Exclusão", JOptionPane.YES_NO_OPTION);
+            
+            if (confirma == JOptionPane.YES_OPTION) {
+                // Chamada limpa: passamos null para usuário, nome, senha e texto.
+                // O método enviarDados anexará o meuToken automaticamente.
+                // Gerando o JSON: {"op": "deletarUsuario", "token": "..."}
+                MensagemDTO res = enviarDados(null, null, null, "deletarUsuario", null);
+
+                if (res != null && "200".equals(res.resposta)) {
+                    JOptionPane.showMessageDialog(this, res.mensagem, "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+                    // Como a conta não existe mais, forçamos o logout e voltamos para a tela de login
+                    try { socket.close(); } catch (Exception ex) {}
+                    cardLayout.show(painelPrincipal, "LOGIN");
+                } else {
+                    JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro ao deletar", "Erro", JOptionPane.ERROR_MESSAGE);
+                }
             }
         });
 
         bOut.addActionListener(e -> {
-            enviarDados(meuUsuario, null, null, "logout", null);
+            enviarDados(meuUsuario, null, null, "logout", meuToken);
             try { socket.close(); } catch (Exception ex) {}
             areaLogs.setText(""); areaChatPane.setText("");
             cardLayout.show(painelPrincipal, "LOGIN");
         });
         
         bBye.addActionListener(e -> { 
-            enviarDados(meuUsuario, null, null, "logout", null); 
+            enviarDados(meuUsuario, null, null, "logout", meuToken); 
             System.exit(0); 
         });
 
         return split;
     }
 
-    private void atualizarChat() {
-        MensagemDTO res = enviarDados(meuUsuario, null, null, "consultarUsuario", null);
+    /* private void atualizarChat() {
+        MensagemDTO res = enviarDados(meuUsuario, null, null, "lerMensagens", null);
         if (res != null && res.historico != null) {
             areaChatPane.setText(""); 
             for (MensagemDTO m : res.historico) {
@@ -280,14 +294,73 @@ public class ChatClientGUI extends JFrame {
             }
         }
     }
-
-    private void adicionarTextoColorido(String texto, Color cor) {
+ */
+ /*    private void adicionarTextoColorido(String texto, Color cor) {
         StyledDocument doc = areaChatPane.getStyledDocument();
         Style estilo = areaChatPane.addStyle("Estilo", null);
         StyleConstants.setForeground(estilo, cor);
         StyleConstants.setBold(estilo, true);
         try { doc.insertString(doc.getLength(), texto, estilo); } 
         catch (BadLocationException e) { e.printStackTrace(); }
+    } */
+
+    private JPanel criarPainelConfiguracoes() {
+        JPanel p = new JPanel(new GridBagLayout());
+        p.setBackground(Color.WHITE);
+        GridBagConstraints g = new GridBagConstraints();
+        g.insets = new Insets(10, 10, 10, 10); g.fill = GridBagConstraints.HORIZONTAL;
+
+        g.gridx = 0; g.gridy = 0; g.gridwidth = 2;
+        JLabel titulo = new JLabel("Atualizar Cadastro", SwingConstants.CENTER);
+        titulo.setFont(new Font("Arial", Font.BOLD, 16));
+        p.add(titulo, g);
+
+        g.gridwidth = 1; g.gridy = 1; g.gridx = 0;
+        p.add(new JLabel("Novo Nome (deixe em branco p/ manter):"), g);
+        g.gridx = 1; fNovoNome.setColumns(15); p.add(fNovoNome, g);
+
+        g.gridy = 2; g.gridx = 0;
+        p.add(new JLabel("Nova Senha (deixe em branco p/ manter):"), g);
+        g.gridx = 1; fNovaSenha.setColumns(15); p.add(fNovaSenha, g);
+
+        g.gridy = 3; g.gridx = 0; g.gridwidth = 2;
+        JButton bSalvar = new JButton("Salvar Alterações");
+        bSalvar.setBackground(new Color(40, 167, 69)); bSalvar.setForeground(Color.WHITE);
+        bSalvar.addActionListener(e -> executarAtualizacao());
+        p.add(bSalvar, g);
+
+        JPanel container = new JPanel(new BorderLayout());
+        container.setBorder(new EmptyBorder(30, 30, 30, 30));
+        container.add(p, BorderLayout.NORTH);
+        return container;
+    }
+
+    private void executarAtualizacao() {
+        String novoNome = fNovoNome.getText().trim();
+        String novaSenha = new String(fNovaSenha.getPassword()).trim();
+
+        if (novoNome.isEmpty() && novaSenha.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Preencha pelo menos um campo para atualizar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Monta o JSON perfeitamente alinhado com o payload exigido (incluindo as strings vazias)
+        MensagemDTO req = new MensagemDTO();
+        req.op = "atualizarUsuario";
+        req.token = meuToken;
+        req.nome = novoNome;   // Ficará "" se não preenchido
+        req.senha = novaSenha; // Ficará "" se não preenchido
+
+        MensagemDTO res = processarObjeto(req);
+
+        if (res != null && "200".equals(res.resposta)) {
+            JOptionPane.showMessageDialog(this, res.mensagem, "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+            fNovoNome.setText("");
+            fNovaSenha.setText("");
+            if (!novoNome.isEmpty()) meuUsuario = novoNome; // Atualiza localmente
+        } else {
+            JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro no servidor", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private MensagemDTO enviarDados(String u, String n, String s, String op, String t) {
