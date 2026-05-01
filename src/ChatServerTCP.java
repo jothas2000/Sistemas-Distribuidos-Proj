@@ -211,6 +211,7 @@ public class ChatServerTCP { // hash é nosso bd
                             }
                             else if ("logout".equalsIgnoreCase(req.op)) { 
                                 res.resposta = "200";
+                                break;
                             }
 
                             String jsonRes = gson.toJson(res);
