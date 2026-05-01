@@ -191,7 +191,7 @@ public class ChatServerTCP { // hash é nosso bd
                                 if (loginDono != null) {
                                     res.resposta = "200";
                                     res.nome = nomesDB.get(loginDono);
-                                    res.usuario = usuariosDB.get(loginDono);
+                                    res.usuario = loginDono;
                                     res.token = req.token; 
                                 } else {
                                     res.resposta = "401";
