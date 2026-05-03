@@ -7,6 +7,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import com.google.gson.Gson;
 
+@SuppressWarnings("unused")
 public class ChatClientGUI extends JFrame {
     private Socket socket;
     private BufferedReader in;

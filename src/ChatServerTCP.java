@@ -232,6 +232,7 @@ public class ChatServerTCP { // hash é nosso bd
             }
         } catch (IOException e) { 
             e.printStackTrace(); 
+            sc.close();
         }
     }
 }
