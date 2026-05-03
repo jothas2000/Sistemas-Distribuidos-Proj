@@ -145,10 +145,8 @@ public class ChatClientGUI extends JFrame {
             if (conectar(fIP.getText().trim(), Integer.parseInt(fPorta.getText().trim()))) {
                 MensagemDTO res = enviarDados(u, n, s, "cadastrarUsuario", null);
                 JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro", "Aviso", JOptionPane.INFORMATION_MESSAGE);
-                
-                // O PULO DO GATO: Após tentar cadastrar, libere o servidor para a próxima ação!
-                enviarDados(u, null, null, "logout", null); 
-                try { socket.close(); } catch (Exception ex) {}
+            
+                try { socket.close(); System.out.println("Socket fechado para não ocupar a porta em caso de conexão zumbi."); } catch (Exception ex) {System.out.println("Erro ao fechar socket");;}
             }
         });
 

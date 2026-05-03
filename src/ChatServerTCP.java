@@ -210,8 +210,25 @@ public class ChatServerTCP { // hash é nosso bd
                                 res.historico = historicoGeral;
                             }
                             else if ("logout".equalsIgnoreCase(req.op)) { 
-                                res.resposta = "200";
-                                break;
+                                if(req.token != null) {
+                                    res.resposta = "200";
+                                    res.mensagem = "Logout realizado com sucesso";
+                                    String jsonRes = gson.toJson(res);
+                                    System.out.println("<- ENVIADO: " + jsonRes + "\n");
+                                    out.println(jsonRes);
+                                    break;
+                                } else {
+                                    res.resposta = "401";
+                                    res.mensagem = "Token inválido ou ausente.";
+                                    String jsonRes = gson.toJson(res);
+                                    System.out.println("<- ENVIADO: " + jsonRes + "\n");
+                                    out.println(jsonRes);
+                                    break;
+                                }
+                            } 
+                            else {
+                                res.resposta = "400";
+                                res.mensagem = "BAD REQUEST: Operacao desconhecida";
                             }
 
                             String jsonRes = gson.toJson(res);
