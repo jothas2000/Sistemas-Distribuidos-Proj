@@ -24,7 +24,6 @@ public class ChatClientGUI extends JFrame {
     private JTextField fNovoNome = new JTextField();
     private JPasswordField fNovaSenha = new JPasswordField();
 
-    // Campos de teste para o professor forjar tokens nas abas de Admin e Usuário Comum
     private JTextField fTokenAdmin = new JTextField("adm", 15);
     private JTextField fTokenUsuario = new JTextField(15); 
 
@@ -38,7 +37,7 @@ public class ChatClientGUI extends JFrame {
         painelPrincipal.add(criarTelaApp(), "APP");
         add(painelPrincipal);
     }
-
+    // classe que abre a conexão do cliente
     private boolean conectar(String ip, int porta) {
         try {
             socket = new Socket(ip, porta);
@@ -98,7 +97,8 @@ public class ChatClientGUI extends JFrame {
         g.gridy = 6; g.gridx = 0; g.gridwidth = 2;
         caixaLogin.add(pBotoes, g);
         painelFundo.add(caixaLogin);
-
+        
+        // botão de login pega o usuario e senha escritos no input e faz a verificação se um dos dois está vazio e depois verifica se a função conectar retorna true com o ip e a porta enviada corretos, e então verifica se a resposta do servidor é diferente de NULL e a resposta da 200, e então pega o usuário e o token do usuário, e inicializa o campo de teste com o token obtido no login, e ao realizar o login consulta o usuário e se der ok coloca o nome do usuario, se não a o login não é realizado e alegue uma mensagem de erro e lança um logout fechando o socket 
         bLogin.addActionListener(e -> {
             String u = fUser.getText().trim();
             String s = new String(fPass.getPassword()).trim();
@@ -133,6 +133,7 @@ public class ChatClientGUI extends JFrame {
             }
         });
         
+        // botão de cadastro pega o nome o usuario e a senha, verifica se um deles está vazio, se tiver retorna erro e faz a mesma verificação antes de conectar do ip e porta, e manda a requisição de cadastrar o usuário, e caso a requisição esteja vazia sinaliza erro e um aviso vindo do servidor, e ai fecha o socket para que possa receber outra conexão
         bCad.addActionListener(e -> {
             String n = fNome.getText().trim();
             String u = fUser.getText().trim();
@@ -152,7 +153,7 @@ public class ChatClientGUI extends JFrame {
 
         return painelFundo;
     }
-
+    // configuração da aba, caso o token seja adm, vai para a aba do adm, se não vai a página do usuário comum, fazendo removendo a aba do adm 
     private void configurarAbas() {
         if ("adm".equals(meuToken)) {
             if (abasApp.indexOfTab("Painel Admin") == -1) {
@@ -164,7 +165,7 @@ public class ChatClientGUI extends JFrame {
             if (index != -1) abasApp.removeTabAt(index);
         }
     }
-
+    // criação da tela bgrbgrbgbrbgr
     private Container criarTelaApp() {
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         split.setDividerLocation(550);
@@ -215,7 +216,8 @@ public class ChatClientGUI extends JFrame {
                 tMsg.setText(""); 
             }
         });
-
+        
+        // botão de delete, começa um modal que pergunta se o usuário quer apagar a conta, e tem uma variavel confirma, se a opção for igual a sim, chama a resposta de deletarUsuario, e se der tudo certo, manda sucesso fecha o socket e volta o layout para o login, se não da erro ao deletar e volta uma mensagem
         bDel.addActionListener(e -> {
             int confirma = JOptionPane.showConfirmDialog(this, "Tem certeza que deseja apagar sua conta permanentemente?", "Confirmar Exclusão", JOptionPane.YES_NO_OPTION);
             
@@ -231,6 +233,7 @@ public class ChatClientGUI extends JFrame {
             }
         });
 
+        // botão de logout envia a requisição de logout, fecha o socket e apaga tudo do Log e do painel de chat, e depois troca o layout para o login
         bOut.addActionListener(e -> {
             enviarDados(meuUsuario, null, null, "logout", meuToken);
             try { socket.close(); } catch (Exception ex) {}
@@ -238,6 +241,7 @@ public class ChatClientGUI extends JFrame {
             cardLayout.show(painelPrincipal, "LOGIN");
         });
         
+        // da logout e fecha o Cliente
         bBye.addActionListener(e -> { 
             enviarDados(meuUsuario, null, null, "logout", meuToken); 
             System.exit(0); 
@@ -246,6 +250,7 @@ public class ChatClientGUI extends JFrame {
         return split;
     }
 
+    // cria o painel de Cliente Admin
     private JPanel criarPainelAdmin() {
         JPanel p = new JPanel(new GridBagLayout());
         p.setBackground(Color.WHITE);
@@ -294,6 +299,7 @@ public class ChatClientGUI extends JFrame {
         g.gridx = 1; p.add(fDelUser, g);
         g.gridx = 2; p.add(bDel, g); y++;
 
+        // botão de listar os usuários na tela do ADM, utiliza o token do adm para consultar os usuários, processa o objeto e verifica se a lista não está vázia eou a resposta é diferente de null ou a resposta é 200, builda a
         bListar.addActionListener(e -> {
             // Usa o token do campo de teste do admin
             MensagemDTO m = new MensagemDTO(); m.op = "consultarUsuariosAdmin"; m.token_admin = fTokenAdmin.getText().trim();
