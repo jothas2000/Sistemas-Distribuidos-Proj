@@ -216,15 +216,13 @@ public class ChatServerTCP {
                                         
                                         int contador = 1;
                                         for (String usrKey : usuariosDB.keySet()) {
-                                            // Usamos LinkedHashMap para garantir que o 'usuario' venha antes do 'nome' no JSON
+                                            
                                             Map<String, String> userObj = new LinkedHashMap<>();
                                             
                                             // Adiciona "usuario1", "usuario2", etc.
                                             userObj.put("usuario" + contador, usrKey);
                                             
-                                            // Para seguir a exata formatação do professor: "nome" no 1, e "nome2", "nome3" nos outros
-                                            String chaveNome = (contador == 1) ? "nome" : "nome" + contador;
-                                            userObj.put(chaveNome, nomesDB.get(usrKey));
+                                            userObj.put("nome" + contador, nomesDB.get(usrKey));
                                             
                                             res.lista_usuarios.add(userObj);
                                             contador++;
