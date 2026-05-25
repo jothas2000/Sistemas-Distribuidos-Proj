@@ -4,6 +4,8 @@ import java.awt.*;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
 import com.google.gson.Gson;
 
 @SuppressWarnings("unused")
@@ -301,14 +303,21 @@ public class ChatClientGUI extends JFrame {
 
         // botão de listar os usuários na tela do ADM, utiliza o token do adm para consultar os usuários, processa o objeto e verifica se a lista não está vázia eou a resposta é diferente de null ou a resposta é 200, builda a
         bListar.addActionListener(e -> {
-            // Usa o token do campo de teste do admin
             MensagemDTO m = new MensagemDTO(); m.op = "consultarUsuariosAdmin"; m.token_admin = fTokenAdmin.getText().trim();
             MensagemDTO res = processarObjeto(m);
+            
             if (res != null && "200".equals(res.resposta) && res.lista_usuarios != null) {
                 StringBuilder sb = new StringBuilder("=== USUÁRIOS NO SISTEMA ===\n\n");
-                for(MensagemDTO.UsuarioDTO user : res.lista_usuarios) {
-                    sb.append("Login: ").append(user.usuario).append("  |  Nome: ").append(user.nome).append("\n");
+                
+                for(Map<String, String> userMap : res.lista_usuarios) {
+                    String u = "", n = "";
+                    for (String key : userMap.keySet()) {
+                        if (key.startsWith("usuario")) u = userMap.get(key);
+                        if (key.startsWith("nome")) n = userMap.get(key);
+                    }
+                    sb.append("Login: ").append(u).append("  |  Nome: ").append(n).append("\n");
                 }
+                
                 JOptionPane.showMessageDialog(this, sb.toString(), "Lista de Usuários", JOptionPane.INFORMATION_MESSAGE);
             } else {
                 JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro de conexão", "Erro", JOptionPane.ERROR_MESSAGE);

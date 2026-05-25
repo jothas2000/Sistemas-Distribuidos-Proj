@@ -1,11 +1,12 @@
 import java.util.List;
+import java.util.Map;
 
 public class MensagemDTO {
     public String op, usuario, nome, senha, novaSenha, token, token_admin, texto, mensagem, resposta;
     public List<MensagemDTO> historico; 
     
-    // lista para a consulta do adm
-    public List<UsuarioDTO> lista_usuarios; 
+    // Agora é uma lista de dicionários (Maps) para suportar as chaves dinâmicas (usuario1, nome2, etc)
+    public List<Map<String, String>> lista_usuarios; 
 
     public MensagemDTO() {}
     
@@ -13,16 +14,5 @@ public class MensagemDTO {
         this.usuario = usuario;
         this.nome = nome;
         this.texto = texto;
-    }
-
-    // construtor do gson
-    public static class UsuarioDTO {
-        public String nome;
-        public String usuario;
-
-        public UsuarioDTO(String nome, String usuario) {
-            this.nome = nome;
-            this.usuario = usuario;
-        }
     }
 }

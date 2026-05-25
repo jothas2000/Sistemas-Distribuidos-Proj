@@ -12,9 +12,9 @@ public class ChatServerTCP {
     private static final Gson gson = new Gson(); 
 
     static {
-        usuariosDB.put("adm", "123456");
-        nomesDB.put("adm", "admin");
-        tokensDB.put("adm", "adm");
+        usuariosDB.put("admin", "123456");
+        nomesDB.put("admin", "admin");
+        tokensDB.put("admin", "adm");
     }
 
     public static void main(String args[]) {
@@ -63,7 +63,6 @@ public class ChatServerTCP {
                                     continue; // Quebra o ciclo aqui e ignora os if/elses abaixo
                                 }
                             }
-                            // =========================================================================
 
                             if ("login".equalsIgnoreCase(req.op)) {
                                 if (usuariosDB.containsKey(req.usuario) && usuariosDB.get(req.usuario).equals(req.senha)) {
@@ -214,10 +213,23 @@ public class ChatServerTCP {
                                         res.resposta = "200";
                                         res.mensagem = "Usuarios listados com sucesso";
                                         res.lista_usuarios = new ArrayList<>();
+                                        
+                                        int contador = 1;
                                         for (String usrKey : usuariosDB.keySet()) {
-                                            res.lista_usuarios.add(new MensagemDTO.UsuarioDTO(nomesDB.get(usrKey), usrKey));
+                                            // Usamos LinkedHashMap para garantir que o 'usuario' venha antes do 'nome' no JSON
+                                            Map<String, String> userObj = new LinkedHashMap<>();
+                                            
+                                            // Adiciona "usuario1", "usuario2", etc.
+                                            userObj.put("usuario" + contador, usrKey);
+                                            
+                                            // Para seguir a exata formatação do professor: "nome" no 1, e "nome2", "nome3" nos outros
+                                            String chaveNome = (contador == 1) ? "nome" : "nome" + contador;
+                                            userObj.put(chaveNome, nomesDB.get(usrKey));
+                                            
+                                            res.lista_usuarios.add(userObj);
+                                            contador++;
                                         }
-                                    } 
+                                    }
                                     else if ("consultarUsuarioAdmin".equalsIgnoreCase(req.op)) {
                                         if (req.usuario != null && usuariosDB.containsKey(req.usuario)) {
                                             res.resposta = "200";
