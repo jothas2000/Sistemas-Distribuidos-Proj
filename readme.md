@@ -9,7 +9,7 @@ A **Entrega 2** expande o projeto inicial com a introdução de um Módulo de Ad
 * **Módulo de Administração:** Rotas exclusivas para o administrador gerenciar o sistema (listar, consultar, atualizar e forçar a exclusão de usuários).
 * **Defesa contra Token Forgery (Falsificação de Sessão):** O servidor agora implementa "Sessões Autenticadas". O token é vinculado à conexão TCP no momento do login. Qualquer tentativa de enviar um JSON com um token de terceiros pela mesma conexão é sumariamente bloqueada pelo **Filtro Anti-Sequestro**.
 * **Design for Testability (Testabilidade):** A interface gráfica (GUI) foi adaptada com campos de texto editáveis para os tokens. Isso permite que os avaliadores simulem ataques (forjando tokens de Admin ou de outros usuários) para comprovar a eficácia do bloqueio do servidor.
-* **Serialização Dinâmica:** Adaptação do `Gson` para suportar as chaves dinâmicas exigidas no protocolo de listagem de usuários (`usuario1`, `nome`, `usuario2`, `nome2`, etc.) através de Listas de Dicionários (`Maps`).
+* **Serialização Dinâmica:** Adaptação do `Gson` para suportar as chaves dinâmicas exigidas no protocolo de listagem de usuários (`usuario1`, `nome1`, `usuario2`, `nome2`, etc.) através de Listas de Dicionários (`Maps`).
 * **Atualizações Parciais Seguras:** Suporte para envio de campos nulos/vazios durante a atualização de perfil, mantendo a validação estrita de 6 dígitos apenas quando a senha é efetivamente alterada.
 
 ## 🏗️ Arquitetura do Sistema
