@@ -12,9 +12,9 @@ public class ChatServerTCP {
     private static final Gson gson = new Gson(); 
 
     static {
-        usuariosDB.put("admin", "123456");
-        nomesDB.put("admin", "Administrador");
-        tokensDB.put("admin", "adm");
+        usuariosDB.put("adm", "123456");
+        nomesDB.put("adm", "admin");
+        tokensDB.put("adm", "adm");
     }
 
     public static void main(String args[]) {

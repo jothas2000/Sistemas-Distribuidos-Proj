@@ -314,7 +314,7 @@ public class ChatClientGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro de conexão", "Erro", JOptionPane.ERROR_MESSAGE);
             }
         });
-
+        // Botão de consulta do ADMIN faz a consulta dos usuarios pelo adm e retorna os nome de exibição
         bCons.addActionListener(e -> {
             MensagemDTO m = new MensagemDTO(); m.op = "consultarUsuarioAdmin"; 
             m.token_admin = fTokenAdmin.getText().trim(); m.usuario = fConsUser.getText().trim();
@@ -325,7 +325,7 @@ public class ChatClientGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro", "Erro", JOptionPane.ERROR_MESSAGE);
             }
         });
-
+        // Botão de atualização do usuário pelo ADMIN, processa os objetos pegados pela interface, podendo ter modificações parciais, se a resposta for 200, da certo e atualiza, mandando uma mensagem de sucesso
         bAtu.addActionListener(e -> {
             MensagemDTO m = new MensagemDTO(); m.op = "atualizarUsuarioAdmin"; 
             m.token_admin = fTokenAdmin.getText().trim(); m.usuario = fAtuUser.getText().trim();
@@ -337,6 +337,7 @@ public class ChatClientGUI extends JFrame {
             else JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro", "Erro", JOptionPane.ERROR_MESSAGE);
         });
 
+        // Botão delete do ADMIN, o admin tem q escrever o usuário a ser deletado e é enviado do input para um objeto m, que tem o token do Admin, e o usuário a ser deletado, criando o DTO, e processando o objeto, onde é feita a identificação da requisição e de fato é deletado
         bDel.addActionListener(e -> {
             MensagemDTO m = new MensagemDTO(); m.op = "deletarUsuarioAdmin"; 
             m.token_admin = fTokenAdmin.getText().trim(); m.usuario = fDelUser.getText().trim();
@@ -366,7 +367,6 @@ public class ChatClientGUI extends JFrame {
 
         g.gridwidth = 1; 
         
-        // NOVIDADE: Adicionado campo para forjar/modificar token do usuário comum em testes de invasão
         g.gridy = y; g.gridx = 0;
         p.add(new JLabel("Modificar Token Usuário (Teste):"), g);
         g.gridx = 1; p.add(fTokenUsuario, g);
@@ -393,7 +393,7 @@ public class ChatClientGUI extends JFrame {
         container.add(p, BorderLayout.NORTH);
         return container;
     }
-
+    // Executa a atualização do painel ao clickar no botão
     private void executarAtualizacao() {
         String novoNome = fNovoNome.getText().trim();
         String novaSenha = new String(fNovaSenha.getPassword()).trim();
@@ -421,7 +421,7 @@ public class ChatClientGUI extends JFrame {
             JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro no servidor", "Erro", JOptionPane.ERROR_MESSAGE);
         }
     }
-
+    // cria o objeto a ser enviado ao servidor
     private MensagemDTO enviarDados(String u, String n, String s, String op, String t) {
         MensagemDTO req = new MensagemDTO(); req.op=op; req.usuario=u; req.nome=n; req.senha=s; req.texto=t; req.token=meuToken;
         return processarObjeto(req);
