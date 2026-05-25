@@ -176,7 +176,10 @@ public class ChatServerTCP {
                                 }
 
                                 if (loginDono != null) {
-                                    res.resposta = "200"; res.nome = nomesDB.get(loginDono); res.usuario = loginDono; res.token = req.token; 
+                                    res.resposta = "200"; 
+                                    res.nome = nomesDB.get(loginDono); 
+                                    res.usuario = loginDono; 
+                                    res.token = req.token; 
                                 } else { res.resposta = "401"; res.mensagem = "Token invalido ou expirado."; }
                             }
 
