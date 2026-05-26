@@ -176,11 +176,19 @@ public class ChatServerTCP {
                                 }
 
                                 if (loginDono != null) {
-                                    res.resposta = "200"; 
-                                    res.nome = nomesDB.get(loginDono); 
-                                    res.usuario = loginDono; 
-                                    res.token = req.token; 
-                                } else { res.resposta = "401"; res.mensagem = "Token invalido ou expirado."; }
+                                    if (req.usuario != null && usuariosDB.containsKey(req.usuario)) {
+                                        res.resposta = "200"; 
+                                        res.nome = nomesDB.get(loginDono); 
+                                        res.usuario = loginDono; 
+                                        res.token = req.token; 
+                                    } else {
+                                        res.resposta = "401";
+                                        res.mensagem = "Usuário não encontrado no Sistema!";
+                                    }
+                                } else { 
+                                    res.resposta = "401"; 
+                                    res.mensagem = "Token invalido ou expirado."; 
+                                }
                             }
 
                             else if ("enviarMensagem".equalsIgnoreCase(req.op)) {
@@ -224,7 +232,6 @@ public class ChatServerTCP {
                                             
                                             // Adiciona "usuario1", "usuario2", etc.
                                             userObj.put("usuario" + contador, usrKey);
-                                            
                                             userObj.put("nome" + contador, nomesDB.get(usrKey));
                                             
                                             res.lista_usuarios.add(userObj);
