@@ -325,9 +325,5 @@ public class ChatServerTCP {
             sc.close();
         }
     }
-<<<<<<< HEAD
 }
  */
-=======
-}
->>>>>>> 0a0d68ebc897ab8522f74f063affa8f1b7c2e473
