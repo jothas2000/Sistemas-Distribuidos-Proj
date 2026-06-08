@@ -28,14 +28,25 @@ A **Entrega 3** marca a evolução arquitetural do sistema de Síncrono (Iterati
 
 O projeto utiliza a biblioteca `gson-2.10.1.jar` (localizada na pasta `lib`). O separador de *classpath* abaixo está configurado para **Windows** (ponto e vírgula `;`). No Linux/Mac, utilize dois pontos (`:`).
 
+PARA COMPILAR NO WINDOWS
 **1. Compilar todo o projeto:**
 javac -d bin -cp ".;lib/gson-2.10.1.jar" src/*.java
 
 **2. Executar o Servidor:**
-java -cp "bin;lib/gson-2.10.1.jar" ChatServerTCP
+java -cp "bin;lib/gson-2.10.1.jar" ChatServerGUI
 
 **3. Executar o Cliente:**
 java -cp "bin;lib/gson-2.10.1.jar" ChatClientGUI
+
+PARA COMPILAR NO LINUX OU MAX
+**1. Compilar todo o projeto:**
+javac -d bin -cp ".:lib/gson-2.10.1.jar" src/*.java
+
+**2. Executar o Servidor:**
+java -cp "bin:lib/gson-2.10.1.jar" ChatServerGUI
+
+**3. Executar o Cliente:**
+java -cp "bin:lib/gson-2.10.1.jar" ChatClientGUI
 
 (Pode abrir múltiplas instâncias do ChatClientGUI para testar a comunicação simultânea entre utilizadores).
 

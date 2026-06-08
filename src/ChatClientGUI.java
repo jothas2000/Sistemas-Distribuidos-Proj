@@ -1,9 +1,11 @@
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.text.Document;
 import java.awt.*;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 import com.google.gson.Gson;
 
@@ -15,28 +17,37 @@ public class ChatClientGUI extends JFrame {
     private Gson gson = new Gson();
     private String meuToken = "", meuUsuario = "";
 
+    // Layout Principal
     private CardLayout cardLayout = new CardLayout();
     private JPanel painelPrincipal = new JPanel(cardLayout);
     
-    private JTextPane areaChatPane = new JTextPane();
+    // Logs e Admin
     private JTextArea areaLogs = new JTextArea();
     private JTabbedPane abasApp = new JTabbedPane();
     private JPanel painelAdmin;
     private JTextField fNovoNome = new JTextField();
     private JPasswordField fNovaSenha = new JPasswordField();
-
     private JTextField fTokenAdmin = new JTextField("adm", 15);
     private JTextField fTokenUsuario = new JTextField(15); 
 
-    // --- EP-3: Elementos Novos de Interface ---
+    // =========================================================================
+    // ==== NOVA INTERFACE DE CHAT (MASTER-DETAIL) =============================
+    // =========================================================================
     private DefaultListModel<String> modeloOnline = new DefaultListModel<>();
     private JList<String> listaOnlineUI = new JList<>(modeloOnline);
-    private JComboBox<String> comboDestino = new JComboBox<>();
+    
+    // O "Baralho de Cartas" que guarda os painéis de conversa
+    private CardLayout layoutChats = new CardLayout();
+    private JPanel containerChats = new JPanel(layoutChats);
+    
+    // Dicionário para guardar o histórico de cada pessoa
+    private Map<String, JTextPane> paineisDeTexto = new HashMap<>();
+    
     private Timer timerAtualizacao;
     private boolean escutandoServidor = false;
 
     public ChatClientGUI() {
-        setTitle("Chat Distribuído - UTFPR (EP-3)");
+        setTitle("Chat Distribuído - UTFPR (EP-3 GUI Moderna)");
         setSize(1000, 650);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null); 
@@ -117,15 +128,16 @@ public class ChatClientGUI extends JFrame {
 
             if (conectar(fIP.getText().trim(), Integer.parseInt(fPorta.getText().trim()))) {
                 MensagemDTO req = new MensagemDTO(); req.op = "login"; req.usuario = u; req.senha = s;
-                MensagemDTO res = enviarDadosSincrono(req); // Login ainda é síncrono
+                MensagemDTO res = enviarDadosSincrono(req);
                 
                 if (res != null && "200".equals(res.resposta)) {
                     meuUsuario = u; meuToken = res.token;
                     fTokenUsuario.setText(meuToken); 
                     
                     configurarAbas(); 
-                    iniciarThreadReceptora(); // INICIA A ESCUTA ASSÍNCRONA EP-3
-                    iniciarPollingUsuarios(); // Inicia atualização da lista de online
+                    iniciarAmbienteChat(); // Prepara os painéis dinâmicos
+                    iniciarThreadReceptora(); 
+                    iniciarPollingUsuarios(); 
                     cardLayout.show(painelPrincipal, "APP");
                 } else {
                     JOptionPane.showMessageDialog(this, res != null ? res.mensagem : "Erro de conexão", "Falha", JOptionPane.ERROR_MESSAGE);
@@ -167,49 +179,114 @@ public class ChatClientGUI extends JFrame {
         }
     }
 
+    // =========================================================================
+    // ==== CONSTRUÇÃO DA TELA DE CHAT (MASTER-DETAIL) =========================
+    // =========================================================================
+
+    private void iniciarAmbienteChat() {
+        paineisDeTexto.clear();
+        containerChats.removeAll();
+        modeloOnline.clear();
+        
+        // Cria a sala fixa de Broadcast
+        containerChats.add(criarPainelConversa("todos"), "todos");
+        modeloOnline.addElement("🌍 Chat Geral");
+        listaOnlineUI.setSelectedIndex(0);
+    }
+
+    private JPanel criarPainelConversa(String alvo) {
+        JPanel painel = new JPanel(new BorderLayout());
+        
+        // Área de histórico deste chat específico
+        JTextPane areaDeTexto = new JTextPane();
+        areaDeTexto.setEditable(false);
+        areaDeTexto.setFont(new Font("Arial", Font.PLAIN, 14));
+        paineisDeTexto.put(alvo, areaDeTexto); // Guarda no dicionário
+        
+        // Área de Input
+        JTextField inputTexto = new JTextField();
+        JButton btnEnviar = new JButton("Enviar");
+        
+        btnEnviar.addActionListener(e -> {
+            String msg = inputTexto.getText().trim();
+            if(!msg.isEmpty()) {
+                MensagemDTO req = new MensagemDTO();
+                req.token = meuToken;
+                req.mensagem = msg;
+                
+                if ("todos".equals(alvo)) {
+                    req.op = "enviarBroadcast";
+                } else {
+                    req.op = "enviarMensagem";
+                    req.destinatario = alvo;
+                    // Mostra a própria mensagem no meu ecrã para eu ver o que enviei
+                    adicionarMensagemChat(alvo, "[Você]: " + msg);
+                }
+                
+                enviarDadosAssincrono(req);
+                inputTexto.setText("");
+            }
+        });
+        
+        JPanel pSul = new JPanel(new BorderLayout(5, 5));
+        pSul.setBorder(new EmptyBorder(5, 5, 5, 5));
+        pSul.add(inputTexto, BorderLayout.CENTER);
+        pSul.add(btnEnviar, BorderLayout.EAST);
+        
+        // Cabeçalho da sala
+        JLabel titulo = new JLabel("Conversando com: " + ("todos".equals(alvo) ? "Todos (Broadcast)" : alvo), SwingConstants.CENTER);
+        titulo.setFont(new Font("Arial", Font.BOLD, 14));
+        titulo.setBorder(new EmptyBorder(5, 0, 5, 0));
+        titulo.setOpaque(true);
+        titulo.setBackground(new Color(230, 230, 230));
+
+        painel.add(titulo, BorderLayout.NORTH);
+        painel.add(new JScrollPane(areaDeTexto), BorderLayout.CENTER);
+        painel.add(pSul, BorderLayout.SOUTH);
+        
+        return painel;
+    }
+
     private Container criarTelaApp() {
         JSplitPane splitPrincipal = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         splitPrincipal.setDividerLocation(600);
         
-        // --- CHAT COM LISTA DE ONLINE (EP-3) ---
-        JPanel pChatContainer = new JPanel(new BorderLayout());
-        areaChatPane.setEditable(false);
-        areaChatPane.setFont(new Font("Arial", Font.PLAIN, 14));
+        // ==== LADO ESQUERDO: LISTA DE USUÁRIOS ====
+        listaOnlineUI.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        listaOnlineUI.setFont(new Font("Arial", Font.BOLD, 14));
+        listaOnlineUI.setFixedCellHeight(30);
         
         JPanel painelOnline = new JPanel(new BorderLayout());
-        painelOnline.setPreferredSize(new Dimension(150, 0));
-        painelOnline.setBorder(BorderFactory.createTitledBorder("Logados"));
+        painelOnline.setPreferredSize(new Dimension(160, 0));
+        painelOnline.setBorder(BorderFactory.createTitledBorder("Salas / Logados"));
         painelOnline.add(new JScrollPane(listaOnlineUI), BorderLayout.CENTER);
         
-        JSplitPane splitChat = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(areaChatPane), painelOnline);
-        splitChat.setResizeWeight(0.8);
-        pChatContainer.add(splitChat, BorderLayout.CENTER);
+        // Ação de clicar num usuário da lista: Puxa o painel correspondente
+        listaOnlineUI.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                String alvoSelecionado = listaOnlineUI.getSelectedValue();
+                if (alvoSelecionado != null) {
+                    if ("🌍 Chat Geral".equals(alvoSelecionado)) {
+                        layoutChats.show(containerChats, "todos");
+                    } else {
+                        // Se for a primeira vez que clico neste usuário, crio a sala dele
+                        if (!paineisDeTexto.containsKey(alvoSelecionado)) {
+                            containerChats.add(criarPainelConversa(alvoSelecionado), alvoSelecionado);
+                        }
+                        layoutChats.show(containerChats, alvoSelecionado);
+                    }
+                }
+            }
+        });
 
-        // --- PAINEL DE ENVIO EP-3 ---
-        JTextField tMsg = new JTextField(); 
-        JButton bEnv = new JButton("Enviar Msg");
-        
-        comboDestino.addItem("todos"); 
-        
-        JPanel pEnvio = new JPanel(new BorderLayout(5, 5));
-        pEnvio.setBorder(new EmptyBorder(5, 5, 5, 5));
-        pEnvio.add(new JLabel("Para:"), BorderLayout.WEST);
-        pEnvio.add(comboDestino, BorderLayout.CENTER);
-        
-        JPanel pInputMsg = new JPanel(new BorderLayout(5, 5));
-        pInputMsg.add(tMsg, BorderLayout.CENTER);
-        pInputMsg.add(bEnv, BorderLayout.EAST);
-        
-        JPanel pSulChat = new JPanel(new BorderLayout());
-        pSulChat.add(pEnvio, BorderLayout.NORTH);
-        pSulChat.add(pInputMsg, BorderLayout.CENTER);
-        
-        pChatContainer.add(pSulChat, BorderLayout.SOUTH);
-        // -----------------------------
+        // ==== LADO DIREITO: O GERENCIADOR DE PAINÉIS (CARDLAYOUT) ====
+        JSplitPane splitChat = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, painelOnline, containerChats);
+        splitChat.setDividerLocation(160);
 
-        abasApp.addTab("Chat Geral", pChatContainer);
+        abasApp.addTab("Mensagens", splitChat);
         abasApp.addTab("Perfil/Config", criarPainelConfiguracoes()); 
 
+        // Console de Logs
         JPanel pLogs = new JPanel(new BorderLayout());
         areaLogs.setBackground(Color.BLACK); areaLogs.setForeground(Color.GREEN);
         areaLogs.setFont(new Font("Monospaced", Font.PLAIN, 12));
@@ -224,38 +301,34 @@ public class ChatClientGUI extends JFrame {
 
         splitPrincipal.setLeftComponent(abasApp); splitPrincipal.setRightComponent(pLogs);
 
-        // AÇÃO ENVIAR MENSAGEM (EP-3 - Usa broadcast ou unicast)
-        bEnv.addActionListener(e -> { 
-            if(!tMsg.getText().trim().isEmpty()) {
-                String dest = comboDestino.getSelectedItem().toString();
-                MensagemDTO req = new MensagemDTO();
-                req.op = "todos".equals(dest) ? "enviarBroadcast" : "enviarMensagem";
-                req.token = meuToken;
-                req.destinatario = "todos".equals(dest) ? null : dest;
-                req.mensagem = tMsg.getText();
-                
-                enviarDadosAssincrono(req);
-                tMsg.setText(""); 
-            }
-        });
-
         bOut.addActionListener(e -> {
             MensagemDTO req = new MensagemDTO(); req.op = "logout"; req.token = meuToken;
-            enviarDadosAssincrono(req);
-            fecharSessao();
+            enviarDadosAssincrono(req); fecharSessao();
         });
         
         bBye.addActionListener(e -> { 
             MensagemDTO req = new MensagemDTO(); req.op = "logout"; req.token = meuToken;
-            enviarDadosAssincrono(req);
-            System.exit(0); 
+            enviarDadosAssincrono(req); System.exit(0); 
         });
 
         return splitPrincipal;
     }
 
+    // Função que insere o texto exatamente na aba correta (mesmo se você não estiver olhando pra ela)
+    private void adicionarMensagemChat(String alvo, String texto) {
+        if (!paineisDeTexto.containsKey(alvo)) {
+            containerChats.add(criarPainelConversa(alvo), alvo);
+        }
+        JTextPane area = paineisDeTexto.get(alvo);
+        try {
+            Document doc = area.getDocument();
+            doc.insertString(doc.getLength(), texto + "\n", null);
+            area.setCaretPosition(doc.getLength());
+        } catch (Exception e) {}
+    }
+
     // =========================================================================
-    // ======== MÓDULO ASSÍNCRONO E THREADS (EP-3) =============================
+    // ==== PROCESSAMENTO DE DADOS (THREADS) ===================================
     // =========================================================================
 
     private void iniciarThreadReceptora() {
@@ -279,32 +352,37 @@ public class ChatClientGUI extends JFrame {
     private void processarChegadaDeDados(String jsonResponse) {
         areaLogs.append("<- " + jsonResponse + "\n\n"); 
         areaLogs.setCaretPosition(areaLogs.getDocument().getLength());
-        
         MensagemDTO res = gson.fromJson(jsonResponse, MensagemDTO.class);
 
-        // Chegada de Mensagens no Chat
         if ("receberMensagem".equals(res.op)) {
-            areaChatPane.setText(areaChatPane.getText() + "\n[PRIVADO] " + res.remetente + " diz: " + res.mensagem);
+            // A mensagem chegou de alguém. Jogo direto no painel daquele alguém!
+            adicionarMensagemChat(res.remetente, "[" + res.remetente + "]: " + res.mensagem);
         } 
         else if ("receberBroadcast".equals(res.op)) {
-            areaChatPane.setText(areaChatPane.getText() + "\n[BROADCAST] " + res.remetente + " diz: " + res.mensagem);
+            // A mensagem é pública. Jogo no painel "todos" (Chat Geral)
+            adicionarMensagemChat("todos", "[GERAL - " + res.remetente + "]: " + res.mensagem);
         }
-        // Atualização da Lista de Utilizadores
         else if (res.usuarios != null && "200".equals(res.resposta)) {
-            String destinoAtual = (String) comboDestino.getSelectedItem();
-            comboDestino.removeAllItems();
-            comboDestino.addItem("todos");
+            // Atualiza a lista lateral sem perder quem estava selecionado
+            String selecionadoAtual = listaOnlineUI.getSelectedValue();
             modeloOnline.clear();
+            modeloOnline.addElement("🌍 Chat Geral");
             
             for (String u : res.usuarios) {
-                modeloOnline.addElement(u);
-                if (!u.equals(meuUsuario)) comboDestino.addItem(u);
+                if (!u.equals(meuUsuario)) {
+                    modeloOnline.addElement(u);
+                    // Cria uma sala em background se o cara logou agora
+                    if (!paineisDeTexto.containsKey(u)) {
+                        containerChats.add(criarPainelConversa(u), u);
+                    }
+                }
             }
-            if (destinoAtual != null && res.usuarios.contains(destinoAtual)) {
-                comboDestino.setSelectedItem(destinoAtual);
+            if (selecionadoAtual != null && modeloOnline.contains(selecionadoAtual)) {
+                listaOnlineUI.setSelectedValue(selecionadoAtual, true);
+            } else {
+                listaOnlineUI.setSelectedIndex(0);
             }
         }
-        // Retorno da lista de Administrador
         else if (res.lista_usuarios != null && "200".equals(res.resposta)) {
             StringBuilder sb = new StringBuilder("=== USUÁRIOS NO SISTEMA ===\n\n");
             for(Map<String, String> userMap : res.lista_usuarios) {
@@ -317,7 +395,6 @@ public class ChatClientGUI extends JFrame {
             }
             JOptionPane.showMessageDialog(this, sb.toString(), "Lista de Usuários", JOptionPane.INFORMATION_MESSAGE);
         }
-        // Mensagens de Sucesso ou Erro Crítico (Alertas)
         else if (res.mensagem != null) {
             if ("401".equals(res.resposta)) {
                 JOptionPane.showMessageDialog(this, res.mensagem, "Aviso de Segurança / Erro", JOptionPane.WARNING_MESSAGE);
@@ -342,11 +419,10 @@ public class ChatClientGUI extends JFrame {
         escutandoServidor = false;
         if (timerAtualizacao != null) timerAtualizacao.stop();
         try { socket.close(); } catch (Exception ex) {}
-        areaLogs.setText(""); areaChatPane.setText("");
+        areaLogs.setText(""); 
         cardLayout.show(painelPrincipal, "LOGIN");
     }
 
-    // Envio antes de iniciar a Thread (Usado no Login e Cadastro)
     private MensagemDTO enviarDadosSincrono(MensagemDTO req) {
         try {
             String jsonRequest = gson.toJson(req); 
@@ -356,7 +432,6 @@ public class ChatClientGUI extends JFrame {
         } catch (Exception e) { return null; }
     }
 
-    // Envio enquanto o Chat está aberto (Não espera resposta, a Thread que lê)
     private void enviarDadosAssincrono(MensagemDTO req) {
         try {
             String jsonRequest = gson.toJson(req); 
@@ -367,7 +442,7 @@ public class ChatClientGUI extends JFrame {
     }
 
     // =========================================================================
-    // ======== ABAS SECUNDÁRIAS (ADMIN E CONFIGURAÇÕES) =======================
+    // ==== PAINÉIS DE ADMIN E CONFIGURAÇÃO (Mantidos intactos) ================
     // =========================================================================
 
     private JPanel criarPainelAdmin() {
@@ -378,80 +453,42 @@ public class ChatClientGUI extends JFrame {
         g.fill = GridBagConstraints.HORIZONTAL;
 
         int y = 0;
-
         g.gridx = 0; g.gridy = y; p.add(new JLabel("Modificar Token Admin (Teste):"), g);
-        g.gridx = 1; g.gridwidth = 2; p.add(fTokenAdmin, g);
-        g.gridwidth = 1; y++;
-
+        g.gridx = 1; g.gridwidth = 2; p.add(fTokenAdmin, g); g.gridwidth = 1; y++;
         p.add(new JSeparator(), g); y++;
 
         JButton bListar = new JButton("Listar Todos os Usuários (Console/Pop-Up)");
         bListar.setBackground(new Color(70, 130, 180)); bListar.setForeground(Color.WHITE);
-        g.gridx = 0; g.gridy = y; g.gridwidth = 3; p.add(bListar, g);
-        g.gridwidth = 1; y++;
-
+        g.gridx = 0; g.gridy = y; g.gridwidth = 3; p.add(bListar, g); g.gridwidth = 1; y++;
         p.add(new JSeparator(), g); y++;
 
         JTextField fConsUser = new JTextField(15);
         JButton bCons = new JButton("Buscar Dados");
         g.gridx = 0; g.gridy = y; p.add(new JLabel("Consultar (Login alvo):"), g);
-        g.gridx = 1; p.add(fConsUser, g);
-        g.gridx = 2; p.add(bCons, g); y++;
-
+        g.gridx = 1; p.add(fConsUser, g); g.gridx = 2; p.add(bCons, g); y++;
         p.add(new JSeparator(), g); y++;
 
-        JTextField fAtuUser = new JTextField(15);
-        JTextField fAtuNome = new JTextField(15);
-        JTextField fAtuSenha = new JTextField(15);
+        JTextField fAtuUser = new JTextField(15); JTextField fAtuNome = new JTextField(15); JTextField fAtuSenha = new JTextField(15);
         JButton bAtu = new JButton("Forçar Atualização");
-        
         g.gridx = 0; g.gridy = y; p.add(new JLabel("Login alvo para alterar:"), g);
         g.gridx = 1; g.gridwidth = 2; p.add(fAtuUser, g); g.gridwidth = 1; y++;
-        
         g.gridx = 0; g.gridy = y; p.add(new JLabel("Novo Nome (vazio p/ ignorar):"), g);
         g.gridx = 1; g.gridwidth = 2; p.add(fAtuNome, g); g.gridwidth = 1; y++;
-        
         g.gridx = 0; g.gridy = y; p.add(new JLabel("Nova Senha (vazio p/ ignorar):"), g);
-        g.gridx = 1; p.add(fAtuSenha, g); 
-        g.gridx = 2; p.add(bAtu, g); y++;
-
+        g.gridx = 1; p.add(fAtuSenha, g); g.gridx = 2; p.add(bAtu, g); y++;
         p.add(new JSeparator(), g); y++;
 
-        JTextField fDelUser = new JTextField(15);
-        JButton bDel = new JButton("Apagar Conta");
+        JTextField fDelUser = new JTextField(15); JButton bDel = new JButton("Apagar Conta");
         bDel.setBackground(Color.RED); bDel.setForeground(Color.WHITE);
         g.gridx = 0; g.gridy = y; p.add(new JLabel("Login alvo para excluir:"), g);
-        g.gridx = 1; p.add(fDelUser, g);
-        g.gridx = 2; p.add(bDel, g); y++;
+        g.gridx = 1; p.add(fDelUser, g); g.gridx = 2; p.add(bDel, g); y++;
 
-        bListar.addActionListener(e -> {
-            MensagemDTO m = new MensagemDTO(); m.op = "consultarUsuariosAdmin"; m.token_admin = fTokenAdmin.getText().trim();
-            enviarDadosAssincrono(m); // A resposta aciona o JOptionPane lá na Thread
-        });
+        bListar.addActionListener(e -> { MensagemDTO m = new MensagemDTO(); m.op = "consultarUsuariosAdmin"; m.token_admin = fTokenAdmin.getText().trim(); enviarDadosAssincrono(m); });
+        bCons.addActionListener(e -> { MensagemDTO m = new MensagemDTO(); m.op = "consultarUsuarioAdmin"; m.token_admin = fTokenAdmin.getText().trim(); m.usuario = fConsUser.getText().trim(); enviarDadosAssincrono(m); });
+        bAtu.addActionListener(e -> { MensagemDTO m = new MensagemDTO(); m.op = "atualizarUsuarioAdmin"; m.token_admin = fTokenAdmin.getText().trim(); m.usuario = fAtuUser.getText().trim(); m.nome = fAtuNome.getText().trim().isEmpty() ? null : fAtuNome.getText().trim(); m.senha = fAtuSenha.getText().trim().isEmpty() ? null : fAtuSenha.getText().trim(); enviarDadosAssincrono(m); });
+        bDel.addActionListener(e -> { MensagemDTO m = new MensagemDTO(); m.op = "deletarUsuarioAdmin"; m.token_admin = fTokenAdmin.getText().trim(); m.usuario = fDelUser.getText().trim(); enviarDadosAssincrono(m); });
 
-        bCons.addActionListener(e -> {
-            MensagemDTO m = new MensagemDTO(); m.op = "consultarUsuarioAdmin"; 
-            m.token_admin = fTokenAdmin.getText().trim(); m.usuario = fConsUser.getText().trim();
-            enviarDadosAssincrono(m);
-        });
-
-        bAtu.addActionListener(e -> {
-            MensagemDTO m = new MensagemDTO(); m.op = "atualizarUsuarioAdmin"; 
-            m.token_admin = fTokenAdmin.getText().trim(); m.usuario = fAtuUser.getText().trim();
-            m.nome = fAtuNome.getText().trim().isEmpty() ? null : fAtuNome.getText().trim(); 
-            m.senha = fAtuSenha.getText().trim().isEmpty() ? null : fAtuSenha.getText().trim();
-            enviarDadosAssincrono(m);
-        });
-
-        bDel.addActionListener(e -> {
-            MensagemDTO m = new MensagemDTO(); m.op = "deletarUsuarioAdmin"; 
-            m.token_admin = fTokenAdmin.getText().trim(); m.usuario = fDelUser.getText().trim();
-            enviarDadosAssincrono(m);
-        });
-
-        JPanel wrap = new JPanel(new BorderLayout());
-        wrap.add(new JScrollPane(p), BorderLayout.CENTER);
-        return wrap;
+        JPanel wrap = new JPanel(new BorderLayout()); wrap.add(new JScrollPane(p), BorderLayout.CENTER); return wrap;
     }
 
     private JPanel criarPainelConfiguracoes() {
@@ -461,68 +498,23 @@ public class ChatClientGUI extends JFrame {
         g.insets = new Insets(10, 10, 10, 10); g.fill = GridBagConstraints.HORIZONTAL;
 
         int y = 0;
-        g.gridx = 0; g.gridy = y; g.gridwidth = 2;
-        JLabel titulo = new JLabel("Atualizar Cadastro / Segurança", SwingConstants.CENTER);
-        titulo.setFont(new Font("Arial", Font.BOLD, 16));
-        p.add(titulo, g); y++;
+        g.gridx = 0; g.gridy = y; g.gridwidth = 2; JLabel titulo = new JLabel("Atualizar Cadastro / Segurança", SwingConstants.CENTER); titulo.setFont(new Font("Arial", Font.BOLD, 16)); p.add(titulo, g); y++;
+        g.gridwidth = 1; g.gridy = y; g.gridx = 0; p.add(new JLabel("Modificar Token Usuário (Teste):"), g); g.gridx = 1; p.add(fTokenUsuario, g); y++;
+        g.gridy = y; g.gridx = 0; p.add(new JLabel("Novo Nome (vazio p/ ignorar):"), g); g.gridx = 1; fNovoNome.setColumns(15); p.add(fNovoNome, g); y++;
+        g.gridy = y; g.gridx = 0; p.add(new JLabel("Nova Senha (vazio p/ ignorar):"), g); g.gridx = 1; fNovaSenha.setColumns(15); p.add(fNovaSenha, g); y++;
+        g.gridy = y; g.gridx = 0; g.gridwidth = 2; JButton bSalvar = new JButton("Salvar Alterações"); bSalvar.setBackground(new Color(40, 167, 69)); bSalvar.setForeground(Color.WHITE); bSalvar.addActionListener(e -> executarAtualizacao()); p.add(bSalvar, g); y++;
+        JButton bDel = new JButton("Apagar Minha Conta Permanentemente"); bDel.setBackground(Color.RED); bDel.setForeground(Color.WHITE); g.gridy = y; p.add(bDel, g);
 
-        g.gridwidth = 1; 
-        g.gridy = y; g.gridx = 0;
-        p.add(new JLabel("Modificar Token Usuário (Teste):"), g);
-        g.gridx = 1; p.add(fTokenUsuario, g); y++;
-
-        g.gridy = y; g.gridx = 0;
-        p.add(new JLabel("Novo Nome (vazio p/ ignorar):"), g);
-        g.gridx = 1; fNovoNome.setColumns(15); p.add(fNovoNome, g); y++;
-
-        g.gridy = y; g.gridx = 0;
-        p.add(new JLabel("Nova Senha (vazio p/ ignorar):"), g);
-        g.gridx = 1; fNovaSenha.setColumns(15); p.add(fNovaSenha, g); y++;
-
-        g.gridy = y; g.gridx = 0; g.gridwidth = 2;
-        JButton bSalvar = new JButton("Salvar Alterações");
-        bSalvar.setBackground(new Color(40, 167, 69)); bSalvar.setForeground(Color.WHITE);
-        bSalvar.addActionListener(e -> executarAtualizacao());
-        p.add(bSalvar, g); y++;
-        
-        JButton bDel = new JButton("Apagar Minha Conta Permanentemente");
-        bDel.setBackground(Color.RED); bDel.setForeground(Color.WHITE);
-        g.gridy = y; p.add(bDel, g);
-
-        bDel.addActionListener(e -> {
-            int confirma = JOptionPane.showConfirmDialog(this, "Tem certeza?", "Confirmar Exclusão", JOptionPane.YES_NO_OPTION);
-            if (confirma == JOptionPane.YES_OPTION) {
-                MensagemDTO req = new MensagemDTO(); req.op = "deletarUsuario"; req.token = meuToken;
-                enviarDadosAssincrono(req);
-                fecharSessao();
-            }
-        });
-
-        JPanel container = new JPanel(new BorderLayout());
-        container.setBorder(new EmptyBorder(30, 30, 30, 30));
-        container.add(p, BorderLayout.NORTH);
-        return container;
+        bDel.addActionListener(e -> { int confirma = JOptionPane.showConfirmDialog(this, "Tem certeza?", "Confirmar Exclusão", JOptionPane.YES_NO_OPTION); if (confirma == JOptionPane.YES_OPTION) { MensagemDTO req = new MensagemDTO(); req.op = "deletarUsuario"; req.token = meuToken; enviarDadosAssincrono(req); fecharSessao(); } });
+        JPanel container = new JPanel(new BorderLayout()); container.setBorder(new EmptyBorder(30, 30, 30, 30)); container.add(p, BorderLayout.NORTH); return container;
     }
 
     private void executarAtualizacao() {
-        String novoNome = fNovoNome.getText().trim();
-        String novaSenha = new String(fNovaSenha.getPassword()).trim();
-
-        if (novoNome.isEmpty() && novaSenha.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Preencha pelo menos um campo para atualizar.", "Aviso", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        MensagemDTO req = new MensagemDTO(); req.op = "atualizarUsuario";
-        req.token = fTokenUsuario.getText().trim(); 
-        req.nome = novoNome.isEmpty() ? null : novoNome;   
-        req.senha = novaSenha.isEmpty() ? null : novaSenha; 
-
-        enviarDadosAssincrono(req);
-        fNovoNome.setText(""); fNovaSenha.setText("");
+        String novoNome = fNovoNome.getText().trim(); String novaSenha = new String(fNovaSenha.getPassword()).trim();
+        if (novoNome.isEmpty() && novaSenha.isEmpty()) { JOptionPane.showMessageDialog(this, "Preencha pelo menos um campo para atualizar.", "Aviso", JOptionPane.WARNING_MESSAGE); return; }
+        MensagemDTO req = new MensagemDTO(); req.op = "atualizarUsuario"; req.token = fTokenUsuario.getText().trim(); req.nome = novoNome.isEmpty() ? null : novoNome; req.senha = novaSenha.isEmpty() ? null : novaSenha; 
+        enviarDadosAssincrono(req); fNovoNome.setText(""); fNovaSenha.setText("");
     }
 
-    public static void main(String[] args) { 
-        SwingUtilities.invokeLater(() -> new ChatClientGUI().setVisible(true)); 
-    }
+    public static void main(String[] args) { SwingUtilities.invokeLater(() -> new ChatClientGUI().setVisible(true)); }
 }
