@@ -1,15 +1,16 @@
 import java.util.List;
+import java.util.Map;
 
 public class MensagemDTO {
-    public String op, usuario, nome, senha, novaSenha, token, texto, mensagem, resposta;
-    public List<MensagemDTO> historico; 
+    public String op, usuario, nome, senha, token, token_admin, mensagem, resposta;
+    
+    // Novos campos para o EP-3
+    public String destinatario; 
+    public String remetente;
+    public List<String> usuarios; // Usado no ListarUsuariosLogados
+
+    // Mantido para o Admin
+    public List<Map<String, String>> lista_usuarios; 
 
     public MensagemDTO() {}
-    
-    // Construtor usado pelo Servidor para gravar o histórico
-    public MensagemDTO(String usuario, String nome, String texto) {
-        this.usuario = usuario;
-        this.nome = nome;
-        this.texto = texto;
-    }
 }
