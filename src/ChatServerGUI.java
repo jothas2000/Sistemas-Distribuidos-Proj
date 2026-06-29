@@ -118,7 +118,7 @@ public class ChatServerGUI extends JFrame {
                     }
 
                     // =========================================================================
-                    // 2. ROTAS DE SESSÃO E USUÁRIO COMUM (EP-1 e EP-2 restauradas)
+                    // 2. ROTAS DE SESSÃO E USUÁRIO COMUM
                     // =========================================================================
                     if ("login".equalsIgnoreCase(req.op)) {
                         if (usuariosDB.containsKey(req.usuario) && usuariosDB.get(req.usuario).equals(req.senha)) {
@@ -174,7 +174,7 @@ public class ChatServerGUI extends JFrame {
 
                             if (alterou) {
                                 res.resposta = "200"; res.mensagem = "Atualizado com sucesso";
-                                atualizarListaOnlineUI(); // Caso o nome mude, atualiza a tela
+                                atualizarListaOnlineUI(); 
                             } else {
                                 res.resposta = "401"; res.mensagem = "Nenhum dado válido para atualizar.";
                             }
@@ -207,15 +207,32 @@ public class ChatServerGUI extends JFrame {
                     // =========================================================================
                     // 3. ROTAS DE CHAT EM TEMPO REAL E BROADCAST (EP-3)
                     // =========================================================================
-                    else if ("ListarUsuariosLogados".equalsIgnoreCase(req.op)) {
+                    else if ("listarUsuariosLogados".equalsIgnoreCase(req.op)) {
                         res.resposta = "200";
-                        res.usuarios = new ArrayList<>(sessoesAtivas.keySet());
+                        res.lista_usuarios = new ArrayList<>(sessoesAtivas.keySet());
                     }
 
                     else if ("enviarMensagem".equalsIgnoreCase(req.op)) {
-                        if (sessoesAtivas.containsKey(req.destinatario)) {
+                        // === INTERCEPTA O BROADCAST (Padrão ou com barra) ===
+                        if (req.destinatario != null && (req.destinatario.equals("todos") || req.destinatario.equals("/todos"))) {
                             MensagemDTO pushMsg = new MensagemDTO();
-                            pushMsg.op = "receberMensagem";
+                            pushMsg.op = "enviarMensagem";
+                            pushMsg.remetente = usuarioSessaoAtiva;
+                            pushMsg.mensagem = req.mensagem;
+                            String jsonPush = gson.toJson(pushMsg);
+                            
+                            for (Map.Entry<String, PrintWriter> entrada : sessoesAtivas.entrySet()) {
+                                // Envia para todos, exceto para o remetente
+                                if (!entrada.getKey().equals(usuarioSessaoAtiva)) {
+                                    entrada.getValue().println(jsonPush);
+                                }
+                            }
+                            res.resposta = "200"; res.mensagem = "Mensagem enviada a todos";
+                        } 
+                        // === LÓGICA NORMAL DE UNICAST ===
+                        else if (sessoesAtivas.containsKey(req.destinatario)) {
+                            MensagemDTO pushMsg = new MensagemDTO();
+                            pushMsg.op = "enviarMensagem";
                             pushMsg.remetente = usuarioSessaoAtiva;
                             pushMsg.mensagem = req.mensagem;
                             
@@ -229,7 +246,7 @@ public class ChatServerGUI extends JFrame {
 
                     else if ("enviarBroadcast".equalsIgnoreCase(req.op)) {
                         MensagemDTO pushMsg = new MensagemDTO();
-                        pushMsg.op = "receberBroadcast";
+                        pushMsg.op = "enviarMensagem";
                         pushMsg.remetente = usuarioSessaoAtiva;
                         pushMsg.mensagem = req.mensagem;
                         String jsonPush = gson.toJson(pushMsg);
@@ -243,7 +260,7 @@ public class ChatServerGUI extends JFrame {
                     }
 
                     // =========================================================================
-                    // 4. MÓDULO DE ADMINISTRAÇÃO (EP-2 restauradas)
+                    // 4. MÓDULO DE ADMINISTRAÇÃO 
                     // =========================================================================
                     else if (req.op != null && req.op.endsWith("Admin")) {
                         boolean isAdmin = "admin".equals(usuarioSessaoAtiva);

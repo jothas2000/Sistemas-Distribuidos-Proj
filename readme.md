@@ -38,7 +38,7 @@ java -cp "bin;lib/gson-2.10.1.jar" ChatServerGUI
 **3. Executar o Cliente:**
 java -cp "bin;lib/gson-2.10.1.jar" ChatClientGUI
 
-PARA COMPILAR NO LINUX OU MAX
+PARA COMPILAR NO LINUX OU MAC
 **1. Compilar todo o projeto:**
 javac -d bin -cp ".:lib/gson-2.10.1.jar" src/*.java
 

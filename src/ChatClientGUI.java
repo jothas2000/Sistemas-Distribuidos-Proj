@@ -213,13 +213,14 @@ public class ChatClientGUI extends JFrame {
                 MensagemDTO req = new MensagemDTO();
                 req.token = meuToken;
                 req.mensagem = msg;
+                req.op = "enviarMensagem"; 
                 
-                if ("todos".equals(alvo)) {
-                    req.op = "enviarBroadcast";
-                } else {
-                    req.op = "enviarMensagem";
-                    req.destinatario = alvo;
-                    // Mostra a própria mensagem no meu ecrã para eu ver o que enviei
+                // === A MÁGICA ACONTECE AQUI ===
+                // Se o painel for o "todos", ele coloca a barra na frente na hora de enviar para o servidor
+                req.destinatario = "todos".equals(alvo) ? "/todos" : alvo;   
+                
+                // Só pinta a própria mensagem no histórico se for um chat privado
+                if (!"todos".equals(alvo)) {
                     adicionarMensagemChat(alvo, "[Você]: " + msg);
                 }
                 
@@ -354,24 +355,43 @@ public class ChatClientGUI extends JFrame {
         areaLogs.setCaretPosition(areaLogs.getDocument().getLength());
         MensagemDTO res = gson.fromJson(jsonResponse, MensagemDTO.class);
 
-        if ("receberMensagem".equals(res.op)) {
-            // A mensagem chegou de alguém. Jogo direto no painel daquele alguém!
-            adicionarMensagemChat(res.remetente, "[" + res.remetente + "]: " + res.mensagem);
-        } 
-        else if ("receberBroadcast".equals(res.op)) {
-            // A mensagem é pública. Jogo no painel "todos" (Chat Geral)
-            adicionarMensagemChat("todos", "[GERAL - " + res.remetente + "]: " + res.mensagem);
+        // Dentro de processarChegadaDeDados
+        if ("enviarMensagem".equals(res.op)) {
+            // 1. Identifica se foi um Broadcast (se o destinatário for /todos ou todos)
+            boolean isBroadcast = (res.destinatario != null && (res.destinatario.equals("/todos") || res.destinatario.equals("todos")));
+            
+            // 2. Define a sala destino
+            String salaDestino = isBroadcast ? "todos" : res.remetente;
+            
+            // 3. Exibe no chat (O cliente entende que é uma mensagem recebida)
+            adicionarMensagemChat(salaDestino, "[" + res.remetente + "]: " + res.mensagem);
         }
-        else if (res.usuarios != null && "200".equals(res.resposta)) {
-            // Atualiza a lista lateral sem perder quem estava selecionado
+        // ==== TRATAMENTO INTELIGENTE DE LISTAS ====
+        boolean isListaOnline = false;
+        java.util.List<String> listagemLogados = new java.util.ArrayList<>();
+        
+        // Verifica se a lista de online veio na chave 'usuarios' ou na 'lista_usuarios'
+        if (res.usuarios != null) {
+            isListaOnline = true;
+            listagemLogados = res.usuarios;
+        } else if (res.lista_usuarios != null) {
+            // Se o primeiro item for uma String (ou se a lista for vazia), é a lista de online
+            if (res.lista_usuarios.isEmpty() || res.lista_usuarios.get(0) instanceof String) {
+                isListaOnline = true;
+                for (Object obj : res.lista_usuarios) {
+                    listagemLogados.add(String.valueOf(obj));
+                }
+            }
+        }
+
+        if (isListaOnline && "200".equals(res.resposta)) {
             String selecionadoAtual = listaOnlineUI.getSelectedValue();
             modeloOnline.clear();
             modeloOnline.addElement("🌍 Chat Geral");
             
-            for (String u : res.usuarios) {
+            for (String u : listagemLogados) {
                 if (!u.equals(meuUsuario)) {
                     modeloOnline.addElement(u);
-                    // Cria uma sala em background se o cara logou agora
                     if (!paineisDeTexto.containsKey(u)) {
                         containerChats.add(criarPainelConversa(u), u);
                     }
@@ -383,13 +403,15 @@ public class ChatClientGUI extends JFrame {
                 listaOnlineUI.setSelectedIndex(0);
             }
         }
-        else if (res.lista_usuarios != null && "200".equals(res.resposta)) {
+        // Se for uma lista contendo Mapas, é a resposta da consulta do Administrador
+        else if (res.lista_usuarios != null && !res.lista_usuarios.isEmpty() && res.lista_usuarios.get(0) instanceof java.util.Map && "200".equals(res.resposta)) {
             StringBuilder sb = new StringBuilder("=== USUÁRIOS NO SISTEMA ===\n\n");
-            for(Map<String, String> userMap : res.lista_usuarios) {
+            for(Object obj : res.lista_usuarios) {
+                java.util.Map<?, ?> userMap = (java.util.Map<?, ?>) obj;
                 String u = "", n = "";
-                for (String key : userMap.keySet()) {
-                    if (key.startsWith("usuario")) u = userMap.get(key);
-                    if (key.startsWith("nome")) n = userMap.get(key);
+                for (Object key : userMap.keySet()) {
+                    if (key.toString().startsWith("usuario")) u = userMap.get(key).toString();
+                    if (key.toString().startsWith("nome")) n = userMap.get(key).toString();
                 }
                 sb.append("Login: ").append(u).append("  |  Nome: ").append(n).append("\n");
             }
@@ -406,9 +428,9 @@ public class ChatClientGUI extends JFrame {
 
     private void iniciarPollingUsuarios() {
         if (timerAtualizacao != null) timerAtualizacao.stop();
-        timerAtualizacao = new Timer(5000, e -> {
+        timerAtualizacao = new Timer(20000, e -> {
             if (escutandoServidor) {
-                MensagemDTO req = new MensagemDTO(); req.op = "ListarUsuariosLogados"; req.token = meuToken;
+                MensagemDTO req = new MensagemDTO(); req.op = "listarUsuariosLogados"; req.token = meuToken;
                 enviarDadosAssincrono(req);
             }
         });
