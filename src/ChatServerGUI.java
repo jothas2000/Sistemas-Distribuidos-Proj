@@ -8,22 +8,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.google.gson.Gson;
 
 public class ChatServerGUI extends JFrame {
-    // Bancos de dados em memória (Thread-safe para concorrência do EP-3)
     private static final Map<String, String> usuariosDB = new ConcurrentHashMap<>();
     private static final Map<String, String> nomesDB = new ConcurrentHashMap<>();
     private static final Map<String, String> tokensDB = new ConcurrentHashMap<>();
-    
-    // Dicionário para rotear mensagens em tempo real (EP-3)
     private static final Map<String, PrintWriter> sessoesAtivas = new ConcurrentHashMap<>();
-    
     private static final Gson gson = new Gson();
 
-    // Elementos da Interface Gráfica do Servidor
     private JTextArea areaLogs = new JTextArea();
     private DefaultListModel<String> modeloListaUsuarios = new DefaultListModel<>();
     private JList<String> listaUsuariosUI = new JList<>(modeloListaUsuarios);
 
-    // Semente inicial (Admin)
     static {
         usuariosDB.put("admin", "123456");
         nomesDB.put("admin", "Administrador");
@@ -71,8 +65,7 @@ public class ChatServerGUI extends JFrame {
                 registrarLog("[SERVIDOR] Rodando na porta " + porta);
                 while (true) {
                     Socket clientSocket = serverSocket.accept();
-                    registrarLog("[SERVIDOR] Nova conexão: " + clientSocket.getInetAddress());
-                    // Inicia uma nova Thread isolada para este cliente (EP-3)
+                    registrarLog("[SERVIDOR] Nova conexão: " + clientSocket.getInetAddress() + "\n");
                     new Thread(new ClientHandler(clientSocket)).start();
                 }
             } catch (IOException e) {
@@ -81,7 +74,6 @@ public class ChatServerGUI extends JFrame {
         }).start();
     }
 
-    // CLASSE INTERNA: Lida com cada cliente em uma Thread separada
     private class ClientHandler implements Runnable {
         private Socket socket;
         private BufferedReader in;
@@ -105,9 +97,6 @@ public class ChatServerGUI extends JFrame {
                     MensagemDTO req = gson.fromJson(linha, MensagemDTO.class);
                     MensagemDTO res = new MensagemDTO();
 
-                    // =========================================================================
-                    // 1. FILTRO ANTI-SEQUESTRO DE SESSÃO
-                    // =========================================================================
                     if (!"login".equalsIgnoreCase(req.op) && !"cadastrarUsuario".equalsIgnoreCase(req.op)) {
                         String tokenEnviado = (req.op != null && req.op.endsWith("Admin")) ? req.token_admin : req.token;
                         if (tokenSessaoAtiva == null || !tokenSessaoAtiva.equals(tokenEnviado)) {
@@ -117,9 +106,6 @@ public class ChatServerGUI extends JFrame {
                         }
                     }
 
-                    // =========================================================================
-                    // 2. ROTAS DE SESSÃO E USUÁRIO COMUM
-                    // =========================================================================
                     if ("login".equalsIgnoreCase(req.op)) {
                         if (usuariosDB.containsKey(req.usuario) && usuariosDB.get(req.usuario).equals(req.senha)) {
                             res.resposta = "200"; 
@@ -148,97 +134,63 @@ public class ChatServerGUI extends JFrame {
                     else if ("atualizarUsuario".equalsIgnoreCase(req.op)) {
                         if (usuarioSessaoAtiva != null) {
                             boolean alterou = false;
-
-                            if (req.nome != null && !req.nome.trim().isEmpty()) {
-                                nomesDB.put(usuarioSessaoAtiva, req.nome);
-                                alterou = true;
-                            }
-
+                            if (req.nome != null && !req.nome.trim().isEmpty()) { nomesDB.put(usuarioSessaoAtiva, req.nome); alterou = true; }
                             if (req.senha != null && !req.senha.trim().isEmpty()) {
                                 if (req.senha.matches("\\d{6}")) {
                                     String senhaAntiga = usuariosDB.get(usuarioSessaoAtiva);
-                                    if (!req.senha.equals(senhaAntiga)) {
-                                        usuariosDB.put(usuarioSessaoAtiva, req.senha);
-                                        alterou = true;
-                                    } else {
-                                        res.resposta = "401"; res.mensagem = "A nova senha não pode ser igual à antiga.";
-                                        out.println(gson.toJson(res));
-                                        continue; 
-                                    }
-                                } else {
-                                    res.resposta = "401"; res.mensagem = "A senha deve conter exatamente 6 numeros.";
-                                    out.println(gson.toJson(res));
-                                    continue; 
-                                }
+                                    if (!req.senha.equals(senhaAntiga)) { usuariosDB.put(usuarioSessaoAtiva, req.senha); alterou = true; } 
+                                    else { res.resposta = "401"; res.mensagem = "A nova senha não pode ser igual à antiga."; out.println(gson.toJson(res)); continue; }
+                                } else { res.resposta = "401"; res.mensagem = "A senha deve conter exatamente 6 numeros."; out.println(gson.toJson(res)); continue; }
                             }
-
-                            if (alterou) {
-                                res.resposta = "200"; res.mensagem = "Atualizado com sucesso";
-                                atualizarListaOnlineUI(); 
-                            } else {
-                                res.resposta = "401"; res.mensagem = "Nenhum dado válido para atualizar.";
-                            }
+                            if (alterou) { res.resposta = "200"; res.mensagem = "Atualizado com sucesso"; atualizarListaOnlineUI(); } 
+                            else { res.resposta = "401"; res.mensagem = "Nenhum dado válido para atualizar."; }
                         }
                     }
                     
                     else if ("deletarUsuario".equalsIgnoreCase(req.op)) {
-                        if ("admin".equalsIgnoreCase(usuarioSessaoAtiva)) {
-                            res.resposta = "401"; res.mensagem = "O Administrador principal nao pode ser apagado.";
-                        } else {
-                            usuariosDB.remove(usuarioSessaoAtiva);
-                            nomesDB.remove(usuarioSessaoAtiva);
-                            tokensDB.remove(usuarioSessaoAtiva);
-                            sessoesAtivas.remove(usuarioSessaoAtiva);
-                            atualizarListaOnlineUI();
-                            res.resposta = "200"; res.mensagem = "Deletado com sucesso";
+                        if ("admin".equalsIgnoreCase(usuarioSessaoAtiva)) { res.resposta = "401"; res.mensagem = "O Administrador principal nao pode ser apagado."; } 
+                        else {
+                            usuariosDB.remove(usuarioSessaoAtiva); nomesDB.remove(usuarioSessaoAtiva); tokensDB.remove(usuarioSessaoAtiva); sessoesAtivas.remove(usuarioSessaoAtiva);
+                            atualizarListaOnlineUI(); res.resposta = "200"; res.mensagem = "Deletado com sucesso";
                         }
                     }
                     
                     else if ("consultarUsuario".equalsIgnoreCase(req.op)) {
-                        if (req.usuario != null && usuariosDB.containsKey(req.usuario)) {
-                            res.resposta = "200"; 
-                            res.usuario = req.usuario; 
-                            res.nome = nomesDB.get(req.usuario); 
-                        } else { 
-                            res.resposta = "401"; res.mensagem = "Usuário alvo não encontrado."; 
-                        }
+                        if (req.usuario != null && usuariosDB.containsKey(req.usuario)) { res.resposta = "200"; res.usuario = req.usuario; res.nome = nomesDB.get(req.usuario); } 
+                        else { res.resposta = "401"; res.mensagem = "Usuário alvo não encontrado."; }
                     }
 
-                    // =========================================================================
-                    // 3. ROTAS DE CHAT EM TEMPO REAL E BROADCAST (EP-3)
-                    // =========================================================================
                     else if ("listarUsuariosLogados".equalsIgnoreCase(req.op)) {
-                        res.resposta = "200";
-                        res.lista_usuarios = new ArrayList<>(sessoesAtivas.keySet());
+                        res.resposta = "200"; res.usuarios = new ArrayList<>(sessoesAtivas.keySet());
                     }
 
                     else if ("enviarMensagem".equalsIgnoreCase(req.op)) {
-                        // === INTERCEPTA O BROADCAST (Padrão ou com barra) ===
+                        // === INTERCEPTA O BROADCAST ===
                         if (req.destinatario != null && (req.destinatario.equals("todos") || req.destinatario.equals("/todos"))) {
                             MensagemDTO pushMsg = new MensagemDTO();
                             pushMsg.op = "enviarMensagem";
                             pushMsg.remetente = usuarioSessaoAtiva;
                             pushMsg.mensagem = req.mensagem;
+                            pushMsg.destinatario = "/todos";
                             String jsonPush = gson.toJson(pushMsg);
                             
                             for (Map.Entry<String, PrintWriter> entrada : sessoesAtivas.entrySet()) {
-                                // Envia para todos, exceto para o remetente
-                                if (!entrada.getKey().equals(usuarioSessaoAtiva)) {
-                                    entrada.getValue().println(jsonPush);
-                                }
+                                if (!entrada.getKey().equals(usuarioSessaoAtiva)) { entrada.getValue().println(jsonPush); }
                             }
                             res.resposta = "200"; res.mensagem = "Mensagem enviada a todos";
+                            registrarLog("   [PUSH BROADCAST] -> Enviado para todos ativos.");
                         } 
-                        // === LÓGICA NORMAL DE UNICAST ===
+                        // === UNICAST (PRIVADO) ===
                         else if (sessoesAtivas.containsKey(req.destinatario)) {
                             MensagemDTO pushMsg = new MensagemDTO();
                             pushMsg.op = "enviarMensagem";
                             pushMsg.remetente = usuarioSessaoAtiva;
                             pushMsg.mensagem = req.mensagem;
+                            pushMsg.destinatario = req.destinatario;
                             
-                            PrintWriter outDestino = sessoesAtivas.get(req.destinatario);
-                            outDestino.println(gson.toJson(pushMsg));
+                            sessoesAtivas.get(req.destinatario).println(gson.toJson(pushMsg));
                             res.resposta = "200"; res.mensagem = "Mensagem enviada";
+                            registrarLog("   [PUSH UNICAST] -> Enviado para: " + req.destinatario);
                         } else {
                             res.resposta = "401"; res.mensagem = "Destinatário offline ou inexistente";
                         }
@@ -249,103 +201,66 @@ public class ChatServerGUI extends JFrame {
                         pushMsg.op = "enviarMensagem";
                         pushMsg.remetente = usuarioSessaoAtiva;
                         pushMsg.mensagem = req.mensagem;
+                        pushMsg.destinatario = "/todos";
                         String jsonPush = gson.toJson(pushMsg);
                         
                         for (Map.Entry<String, PrintWriter> entrada : sessoesAtivas.entrySet()) {
-                            if (!entrada.getKey().equals(usuarioSessaoAtiva)) {
-                                entrada.getValue().println(jsonPush);
-                            }
+                            if (!entrada.getKey().equals(usuarioSessaoAtiva)) { entrada.getValue().println(jsonPush); }
                         }
                         res.resposta = "200"; res.mensagem = "Mensagem enviada a todos";
+                        registrarLog("   [PUSH BROADCAST] -> Enviado para todos ativos.");
                     }
 
-                    // =========================================================================
-                    // 4. MÓDULO DE ADMINISTRAÇÃO 
-                    // =========================================================================
                     else if (req.op != null && req.op.endsWith("Admin")) {
                         boolean isAdmin = "admin".equals(usuarioSessaoAtiva);
 
-                        if (!isAdmin) {
-                            res.resposta = "401"; res.mensagem = "Acesso Negado: Credenciais de administrador invalidas.";
-                        } else {
+                        if (!isAdmin) { res.resposta = "401"; res.mensagem = "Acesso Negado: Credenciais invalidas."; } 
+                        else {
                             if ("consultarUsuariosAdmin".equalsIgnoreCase(req.op)) {
-                                res.resposta = "200";
-                                res.lista_usuarios = new ArrayList<>();
-                                int contador = 1;
+                                res.resposta = "200"; res.lista_usuarios = new ArrayList<>(); int contador = 1;
                                 for (String usrKey : usuariosDB.keySet()) {
-                                    Map<String, String> userObj = new LinkedHashMap<>();
-                                    userObj.put("usuario" + contador, usrKey);
-                                    String chaveNome = (contador == 1) ? "nome" : "nome" + contador;
-                                    userObj.put(chaveNome, nomesDB.get(usrKey));
-                                    res.lista_usuarios.add(userObj);
-                                    contador++;
+                                    Map<String, String> userObj = new LinkedHashMap<>(); userObj.put("usuario" + contador, usrKey);
+                                    String chaveNome = (contador == 1) ? "nome" : "nome" + contador; userObj.put(chaveNome, nomesDB.get(usrKey));
+                                    res.lista_usuarios.add(userObj); contador++;
                                 }
                             } 
                             else if ("consultarUsuarioAdmin".equalsIgnoreCase(req.op)) {
-                                if (req.usuario != null && usuariosDB.containsKey(req.usuario)) {
-                                    res.resposta = "200"; res.nome = nomesDB.get(req.usuario); res.usuario = req.usuario;
-                                } else { res.resposta = "401"; res.mensagem = "Usuario nao encontrado"; }
+                                if (req.usuario != null && usuariosDB.containsKey(req.usuario)) { res.resposta = "200"; res.nome = nomesDB.get(req.usuario); res.usuario = req.usuario; } 
+                                else { res.resposta = "401"; res.mensagem = "Usuario nao encontrado"; }
                             }
                             else if ("atualizarUsuarioAdmin".equalsIgnoreCase(req.op)) {
                                 if (req.usuario != null && usuariosDB.containsKey(req.usuario)) {
                                     boolean alterou = false;
-                                    if (req.nome != null && !req.nome.trim().isEmpty()) {
-                                        nomesDB.put(req.usuario, req.nome);
-                                        alterou = true;
-                                    }
+                                    if (req.nome != null && !req.nome.trim().isEmpty()) { nomesDB.put(req.usuario, req.nome); alterou = true; }
                                     if (req.senha != null && !req.senha.trim().isEmpty()) {
-                                        if (req.senha.matches("\\d{6}")) {
-                                            usuariosDB.put(req.usuario, req.senha); alterou = true;
-                                        } else {
-                                            res.resposta = "401"; res.mensagem = "A senha deve conter exatamente 6 numeros.";
-                                            alterou = false; 
-                                        }
+                                        if (req.senha.matches("\\d{6}")) { usuariosDB.put(req.usuario, req.senha); alterou = true; } 
+                                        else { res.resposta = "401"; res.mensagem = "A senha deve conter exatamente 6 numeros."; alterou = false; }
                                     }
-                                    if (alterou) {
-                                        res.resposta = "200"; res.mensagem = "Usuario atualizado com sucesso";
-                                        atualizarListaOnlineUI();
-                                    } else if (res.resposta == null) {
-                                        res.resposta = "401"; res.mensagem = "Nenhum dado valido fornecido.";
-                                    }
+                                    if (alterou) { res.resposta = "200"; res.mensagem = "Usuario atualizado com sucesso"; atualizarListaOnlineUI(); } 
+                                    else if (res.resposta == null) { res.resposta = "401"; res.mensagem = "Nenhum dado valido fornecido."; }
                                 } else { res.resposta = "401"; res.mensagem = "Usuario nao encontrado"; }
                             }
                             else if ("deletarUsuarioAdmin".equalsIgnoreCase(req.op)) {
                                 if (req.usuario != null && usuariosDB.containsKey(req.usuario)) {
-                                    if ("admin".equalsIgnoreCase(req.usuario)) {
-                                        res.resposta = "401"; res.mensagem = "O administrador principal nao pode ser deletado.";
-                                    } else {
-                                        usuariosDB.remove(req.usuario); nomesDB.remove(req.usuario); tokensDB.remove(req.usuario);
-                                        sessoesAtivas.remove(req.usuario);
-                                        atualizarListaOnlineUI();
-                                        res.resposta = "200"; res.mensagem = "Usuario deletado com sucesso";
-                                    }
+                                    if ("admin".equalsIgnoreCase(req.usuario)) { res.resposta = "401"; res.mensagem = "O administrador principal nao pode ser deletado."; } 
+                                    else { usuariosDB.remove(req.usuario); nomesDB.remove(req.usuario); tokensDB.remove(req.usuario); sessoesAtivas.remove(req.usuario); atualizarListaOnlineUI(); res.resposta = "200"; res.mensagem = "Usuario deletado com sucesso"; }
                                 } else { res.resposta = "401"; res.mensagem = "Usuario nao encontrado"; }
                             }
                         }
                     }
 
-                    // =========================================================================
-                    // 5. SAÍDA
-                    // =========================================================================
-                    else if ("logout".equalsIgnoreCase(req.op)) { 
-                        res.resposta = "200";
-                        break; 
-                    }
+                    else if ("logout".equalsIgnoreCase(req.op)) { res.resposta = "200"; break; }
 
-                    // Devolve a resposta
                     if (res.resposta != null) {
                         String jsonRes = gson.toJson(res);
-                        registrarLog("<- ENVIADO: " + jsonRes);
+                        // AQUI ESTÁ A QUEBRA DE LINHA: Adicionei um \n e uma linha divisória para limpar os logs!
+                        registrarLog("<- ENVIADO: " + jsonRes + "\n\n");
                         out.println(jsonRes);
                     }
                 }
-            } catch (Exception e) {
-                registrarLog("[AVISO] Cliente desconectou.");
-            } finally {
-                if (usuarioSessaoAtiva != null) {
-                    sessoesAtivas.remove(usuarioSessaoAtiva);
-                    atualizarListaOnlineUI();
-                }
+            } catch (Exception e) { registrarLog("[AVISO] Cliente desconectou.\n-----------------------------------------------------"); } 
+            finally {
+                if (usuarioSessaoAtiva != null) { sessoesAtivas.remove(usuarioSessaoAtiva); atualizarListaOnlineUI(); }
                 try { socket.close(); } catch (Exception e) {}
             }
         }
