@@ -6,7 +6,6 @@ import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.Map;
 import com.google.gson.Gson;
 
@@ -170,70 +169,25 @@ public class ChatClientGUI extends JFrame {
 
     private Container criarTelaApp() {
         JSplitPane splitPrincipal = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        splitPrincipal.setDividerLocation(650); // Aumentei um pouco o lado do chat
+        splitPrincipal.setDividerLocation(650); 
         
-        // ==== LADO ESQUERDO: LISTA E CONTROLES ====
         listaOnlineUI.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         listaOnlineUI.setFont(new Font("Arial", Font.BOLD, 14));
         listaOnlineUI.setFixedCellHeight(30);
         
         JPanel painelOnline = new JPanel(new BorderLayout());
-        painelOnline.setPreferredSize(new Dimension(190, 0)); // Aumentado para caber o slider
+        painelOnline.setPreferredSize(new Dimension(190, 0)); 
         painelOnline.setBorder(BorderFactory.createTitledBorder("Logados"));
         painelOnline.add(new JScrollPane(listaOnlineUI), BorderLayout.CENTER);
         
-        // ======== NOVO PAINEL DE CONTROLES SUL ========
-        JPanel painelControles = new JPanel(new GridLayout(2, 1, 0, 5));
-        painelControles.setBorder(new EmptyBorder(5, 0, 0, 0));
-
-        // 1. O Toggle Auto/Manual
-        JPanel painelSlider = new JPanel(new BorderLayout(5, 0));
-        
-        JSlider sliderModo = new JSlider(0, 1, 1); // 0 = Manual (Esq), 1 = Auto (Dir)
-        sliderModo.setSnapToTicks(true);
-        Hashtable<Integer, JLabel> labels = new Hashtable<>();
-        labels.put(0, new JLabel("Manual"));
-        labels.put(1, new JLabel("Auto"));
-        sliderModo.setLabelTable(labels);
-        sliderModo.setPaintLabels(true);
-        
-        JButton btnAtualizar = new JButton("🔄");
-        btnAtualizar.setEnabled(false); // Começa falso porque o slider tá na direita (Auto)
-        btnAtualizar.setToolTipText("Pedir Lista Agora");
-        
-        painelSlider.add(sliderModo, BorderLayout.CENTER);
-        painelSlider.add(btnAtualizar, BorderLayout.EAST);
-        
-        // Ações do Slider
-        sliderModo.addChangeListener(e -> {
-            if (sliderModo.getValue() == 1) { // DIREITA = AUTO
-                btnAtualizar.setEnabled(false);
-                iniciarPollingUsuarios();
-            } else { // ESQUERDA = MANUAL
-                btnAtualizar.setEnabled(true);
-                if (timerAtualizacao != null) timerAtualizacao.stop();
-            }
-        });
-        
-        // Ação do Botão Manual
-        btnAtualizar.addActionListener(e -> {
-            MensagemDTO req = new MensagemDTO(); req.op = "listarUsuariosLogados"; req.token = meuToken;
-            enviarDadosAssincrono(req);
-        });
-
-        // 2. Botão de Broadcast
+        // Botão de Broadcast Simples e Direto (sem o slider de complicações)
         JButton btnBroadcast = new JButton("📢 Enviar Broadcast");
         btnBroadcast.setBackground(new Color(255, 193, 7)); 
         btnBroadcast.setFont(new Font("Arial", Font.BOLD, 12));
         btnBroadcast.setFocusPainted(false);
         btnBroadcast.addActionListener(e -> dispararBroadcastDialog());
         
-        painelControles.add(painelSlider);
-        painelControles.add(btnBroadcast);
-        
-        painelOnline.add(painelControles, BorderLayout.SOUTH);
-        
-        // ==============================================
+        painelOnline.add(btnBroadcast, BorderLayout.SOUTH);
         
         listaOnlineUI.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -358,7 +312,9 @@ public class ChatClientGUI extends JFrame {
 
     private void iniciarPollingUsuarios() {
         if (timerAtualizacao != null) timerAtualizacao.stop();
-        timerAtualizacao = new Timer(20000, e -> {
+        
+        // Timer de 5 segundos para manter a lista atualizada automaticamente de forma super estável!
+        timerAtualizacao = new Timer(5000, e -> {
             if (escutandoServidor) {
                 MensagemDTO req = new MensagemDTO(); req.op = "listarUsuariosLogados"; req.token = meuToken; enviarDadosAssincrono(req);
             }

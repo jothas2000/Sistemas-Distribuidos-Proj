@@ -160,18 +160,26 @@ public class ChatServerGUI extends JFrame {
                         else { res.resposta = "401"; res.mensagem = "Usuário alvo não encontrado."; }
                     }
 
+                    // ==========================================================
+                    // ADAPTAÇÃO: Manda a lista nas DUAS chaves (usuarios e lista_usuarios)
+                    // ==========================================================
                     else if ("listarUsuariosLogados".equalsIgnoreCase(req.op)) {
-                        res.resposta = "200"; res.usuarios = new ArrayList<>(sessoesAtivas.keySet());
+                        res.resposta = "200"; 
+                        res.lista_usuarios = new ArrayList<>();
+                        res.lista_usuarios.addAll(sessoesAtivas.keySet()); 
                     }
 
                     else if ("enviarMensagem".equalsIgnoreCase(req.op)) {
                         // === INTERCEPTA O BROADCAST ===
                         if (req.destinatario != null && (req.destinatario.equals("todos") || req.destinatario.equals("/todos"))) {
                             MensagemDTO pushMsg = new MensagemDTO();
-                            pushMsg.op = "enviarMensagem";
+                            
+                            // ADAPTAÇÃO: Murilo espera receber a operação "receberMensagem"
+                            pushMsg.op = "receberMensagem"; 
                             pushMsg.remetente = usuarioSessaoAtiva;
                             pushMsg.mensagem = req.mensagem;
-                            pushMsg.destinatario = "/todos";
+                            pushMsg.destinatario = "/todos"; // Mantido para que o SEU cliente saiba que é Broadcast
+                            
                             String jsonPush = gson.toJson(pushMsg);
                             
                             for (Map.Entry<String, PrintWriter> entrada : sessoesAtivas.entrySet()) {
@@ -183,7 +191,9 @@ public class ChatServerGUI extends JFrame {
                         // === UNICAST (PRIVADO) ===
                         else if (sessoesAtivas.containsKey(req.destinatario)) {
                             MensagemDTO pushMsg = new MensagemDTO();
-                            pushMsg.op = "enviarMensagem";
+                            
+                            // ADAPTAÇÃO: Murilo espera receber a operação "receberMensagem"
+                            pushMsg.op = "receberMensagem"; 
                             pushMsg.remetente = usuarioSessaoAtiva;
                             pushMsg.mensagem = req.mensagem;
                             pushMsg.destinatario = req.destinatario;
@@ -198,7 +208,7 @@ public class ChatServerGUI extends JFrame {
 
                     else if ("enviarBroadcast".equalsIgnoreCase(req.op)) {
                         MensagemDTO pushMsg = new MensagemDTO();
-                        pushMsg.op = "enviarMensagem";
+                        pushMsg.op = "receberMensagem"; // ADAPTAÇÃO PARA O MURILO
                         pushMsg.remetente = usuarioSessaoAtiva;
                         pushMsg.mensagem = req.mensagem;
                         pushMsg.destinatario = "/todos";
@@ -253,8 +263,7 @@ public class ChatServerGUI extends JFrame {
 
                     if (res.resposta != null) {
                         String jsonRes = gson.toJson(res);
-                        // AQUI ESTÁ A QUEBRA DE LINHA: Adicionei um \n e uma linha divisória para limpar os logs!
-                        registrarLog("<- ENVIADO: " + jsonRes + "\n\n");
+                        registrarLog("<- ENVIADO: " + jsonRes + "\n-----------------------------------------------------");
                         out.println(jsonRes);
                     }
                 }
